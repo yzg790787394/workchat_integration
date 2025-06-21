@@ -66,6 +66,7 @@
 
 ### 步骤3：设置企业微信回调
 
+
 配置完成后，您需要将回调URL设置到企业微信后台：
 
 1. 在集成配置完成后，检查日志中显示的回调URL（格式如：`https://your-ha-domain/api/workchat_callback/your_token`）
@@ -77,6 +78,15 @@
    - **Token**：与配置中相同的Token
    - **EncodingAESKey**：与配置中相同的EncodingAESKey
 6. 保存设置并启用
+
+## 实体信息
+
+![配置图](https://github.com/yzg790787394/workchat_integration/blob/00689b7b4db2f0f5c9fd0b825a7b62de9cc86156/%E9%85%8D%E7%BD%AE%E7%95%8C%E9%9D%A2.jpg)
+![企微通回调url实体](https://github.com/yzg790787394/workchat_integration/blob/bd20ed15e5b4c8ce808288968eb2ef2af0f5ec52/%E5%9B%9E%E8%B0%83url.jpg)
+![企微通上传媒体文件实体](https://github.com/yzg790787394/workchat_integration/blob/bd20ed15e5b4c8ce808288968eb2ef2af0f5ec52/%E5%AA%92%E4%BD%93%E4%B8%8A%E4%BC%A0%E4%BF%A1%E6%81%AF.jpg))
+![企微通文本消息实体](https://github.com/yzg790787394/workchat_integration/blob/bd20ed15e5b4c8ce808288968eb2ef2af0f5ec52/%E6%96%87%E6%9C%AC%E6%B6%88%E6%81%AF.jpg)
+![企微通图片消息实体](https://github.com/yzg790787394/workchat_integration/blob/bd20ed15e5b4c8ce808288968eb2ef2af0f5ec52/%E5%9B%BE%E7%89%87%E6%B6%88%E6%81%AF.jpg)
+![企微通位置消息实体](https://github.com/yzg790787394/workchat_integration/blob/bd20ed15e5b4c8ce808288968eb2ef2af0f5ec52/%E4%BD%8D%E7%BD%AE%E6%B6%88%E6%81%AF.jpg)
 
 ## 🚀 服务使用
 

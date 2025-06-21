@@ -25,7 +25,7 @@ class WorkChatCallbackView(HomeAssistantView):
     def _calculate_signature(self, token, timestamp, nonce, encrypt):
         token = str(token)
         timestamp = str(timestamp)
-        nonce = str(nce)
+        nonce = str(nonce)
         encrypt = str(encrypt)
         
         params = sorted([token, timestamp, nonce, encrypt])

@@ -15,9 +15,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_data[CONF_EXTERNAL_URL] = get_url(hass, prefer_external=True)
     
     # 延迟导入WorkChatClient以避免循环导入
-    from .workchat_client import WorkChatClient  # 修改此处导入语句
+    from .workchat_client import WorkChatClient
     
-    client = WorkChatClient(hass, config_data)  # 修改类名
+    client = WorkChatClient(hass, config_data)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = client
     
     # 设置回调URL

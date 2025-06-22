@@ -33,6 +33,11 @@ ENTITY_DESCRIPTIONS = {
         name="企微通上传媒体文件信息",
         icon="mdi:file-upload",
     ),
+    "menu_click": SensorEntityDescription(  # 新增菜单点击实体
+        key="menu_click",
+        name="企微通自定义菜单触发信息",
+        icon="mdi:menu",
+    ),
 }
 
 class WeComBaseEntity(SensorEntity):
@@ -227,6 +232,50 @@ class WorkChatMediaUploadSensor(SensorEntity):
             "media_id": self.upload_data.get("media_id", "")
         }
 
+class WorkChatMenuClickSensor(WeComBaseEntity):
+    """企微通自定义菜单触发信息实体"""
+    
+    def __init__(self, client, entry):
+        super().__init__(client, entry, "menu_click")
+    
+    def _get_primary_value(self):
+        """返回主要值（EventKey）"""
+        return self.msg_data.get("event_key", "")
+    
+    def _get_type_specific_attrs(self):
+        """返回特定属性"""
+        return {
+            "EventKey": self.msg_data.get("event_key", "")
+        }
+    
+    @property
+    def extra_state_attributes(self):
+        """扩展属性，包括User和CreateTime（转换为北京时间）"""
+        attrs = super().extra_state_attributes
+        # 注意：基类已经提供了user和timestamp（格式化后的时间字符串）属性
+        # 但这里我们按照要求，将User和CreateTime作为单独属性，并且CreateTime是北京时间
+        # 由于基类已经将timestamp转换并放在了一个名为'timestamp'的属性中，但这里要求属性名为'CreateTime'
+        # 我们可以在基类返回的基础上修改，或者覆盖基类的extra_state_attributes方法。
+        # 由于基类已经返回了包含user和timestamp（格式化时间）的字典，我们可以直接使用。
+        # 但是要求是三个属性：User, CreateTime, EventKey
+        # 在基类中，user属性已经存在，我们将其重命名为User（注意大小写）
+        # 同时，基类中有一个'timestamp'属性，我们将其重命名为CreateTime
+        # 另外，我们还需要EventKey，这个在_get_type_specific_attrs中已经返回，并合并到基类属性中。
+        # 因此，我们不需要额外操作，因为基类已经包含了：
+        #   user -> 对应User（但基类属性名为'user'，而要求是'User'，所以需要修改）
+        #   timestamp -> 对应CreateTime（基类属性名为'timestamp'，要求是'CreateTime'）
+        # 所以，我们重新构建一个符合要求的字典，覆盖基类的返回。
+        
+        # 获取基类返回的属性
+        base_attrs = super().extra_state_attributes
+        # 构建新的属性字典
+        new_attrs = {
+            "User": base_attrs.get("user", ""),  # 将基类的user属性映射为User
+            "CreateTime": base_attrs.get("timestamp", ""),  # 基类的timestamp属性就是格式化后的时间字符串
+            "EventKey": self.msg_data.get("event_key", ""),
+        }
+        return new_attrs
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """设置所有企微通消息实体"""
     client = hass.data[DOMAIN][entry.entry_id]
@@ -235,6 +284,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         WorkChatImageSensor(client, entry),
         WorkChatLocationSensor(client, entry),
         WorkChatCallbackInfoSensor(client, entry),
-        WorkChatMediaUploadSensor(client, entry)
+        WorkChatMediaUploadSensor(client, entry),
+        WorkChatMenuClickSensor(client, entry)  # 新增菜单点击实体
     ]
     async_add_entities(entities)

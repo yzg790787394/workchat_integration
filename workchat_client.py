@@ -383,28 +383,30 @@ class WorkChatClient:
             "agent_id": agent_id
         }
         
-        # 根据消息类型解析特定字段 - 只保留文本、图片和位置消息
+        # 根据消息类型解析特定字段 - 新增菜单点击事件处理
         if msg_type == "text":
             event_data["content"] = xml_tree.find("Content").text
         elif msg_type == "image":
             event_data["pic_url"] = xml_tree.find("PicUrl").text
             event_data["media_id"] = xml_tree.find("MediaId").text
         elif msg_type == "location":
-            # 保留原始字符串值以确保精度
             location_x = xml_tree.find("Location_X").text
             location_y = xml_tree.find("Location_Y").text
             scale = xml_tree.find("Scale").text
             label = xml_tree.find("Label").text
             
-            # 记录原始值用于调试
-            _LOGGER.debug("原始位置数据: Location_X=%s, Location_Y=%s, Scale=%s", 
-                         location_x, location_y, scale)
-            
-            # 将值作为原始字符串存储，确保精度
             event_data["lat"] = location_x
             event_data["lon"] = location_y
             event_data["scale"] = float(scale) if scale else None
             event_data["label"] = label
+        elif msg_type == "event":  # 处理事件类型
+            event_type = xml_tree.find("Event").text
+            if event_type == "click":  # 菜单点击事件
+                event_key = xml_tree.find("EventKey").text
+                event_data.update({
+                    "type": "menu_click",  # 使用特殊类型标识菜单点击
+                    "event_key": event_key  # 添加event_key字段
+                })
         
         # 触发事件
         self.hass.bus.async_fire("workchat_message", event_data)

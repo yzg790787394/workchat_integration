@@ -8,6 +8,7 @@ CONF_TOKEN = "token"
 CONF_AES_KEY = "aes_key"
 CONF_RECEIVE_USER = "receive_user"
 CONF_EXTERNAL_URL = "external_url"
+CONF_PROXY = "proxy"  # 新增：代理配置
 
 # 企业微信API基础URL
 API_BASE = "https://qyapi.weixin.qq.com/cgi-bin"

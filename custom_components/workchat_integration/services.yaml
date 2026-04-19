@@ -4,13 +4,13 @@ notify:
   fields:
     msg_type:
       name: "消息类型"
-      description: "text|image|video|file|textcard|news"
+      description: "text|image|file|textcard|news|markdown|voice|video"
       required: true
       default: "text"
-      example: "textcard"
+      example: "markdown"
     message:
       name: "基础内容"
-      description: "文本内容/卡片描述/文件描述"
+      description: "文本内容/卡片描述/markdown内容/文件描述/语音描述"
       example: "传感器异常！"
     title:
       name: "标题"
@@ -18,7 +18,7 @@ notify:
       example: "系统通知"
     media_id:
       name: "媒体ID"
-      description: "图片/视频/文件的媒体ID（需先上传）"
+      description: "图片/视频/文件/语音的媒体ID（需先上传）"
       example: "1Yv-zXfHjSjU-7LH-GwtYqDGS"
     url:
       name: "链接"
@@ -29,6 +29,10 @@ notify:
       description: "卡片消息的按钮文字"
       default: "详情"
       example: "查看详情"
+    picurl:
+      name: "图片URL"
+      description: "图文消息的图片链接"
+      example: "https://example.com/pic.jpg"
     articles:
       name: "图文列表"
       description: "图文消息的多篇文章（YAML格式）"
@@ -41,6 +45,11 @@ notify:
       name: "接收用户"
       description: "指定接收用户ID（默认为配置中的接收用户）"
       example: "@all|user1"
+    description:
+      name: "详细描述"
+      description: "用于视频和语音消息的详细描述"
+      example: "详细的视频描述信息"
+
 
 upload_media:
   name: "上传媒体文件"

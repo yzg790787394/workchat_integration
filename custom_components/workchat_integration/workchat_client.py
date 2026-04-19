@@ -7,8 +7,8 @@ import xml.etree.ElementTree as ET
 from homeassistant.util import dt as dt_util
 from homeassistant.components.http import HomeAssistantView
 from aiohttp import web
-from .const import DOMAIN, API_BASE, CONF_EXTERNAL_URL
-from .encrypt_helper import EncryptHelper
+from .const import DOMAIN, API_BASE, CONF_EXTERNAL_URL, CONF_PROXY
+from .encrypt_helper import EncryptHelper  # 确保这行存在
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,41 +101,71 @@ class WorkChatClient:
             config["aes_key"],
             config["token"]
         )
-        self.callback_url = None  # 初始化回调URL属性
+        self.callback_url = None
+        
+        # 初始化代理设置
+        self.proxies = None
+        proxy_url = config.get(CONF_PROXY, "").strip()
+        if proxy_url:
+            # 验证代理URL格式
+            if proxy_url.startswith(("http://", "https://")):
+                self.proxies = {
+                    "http": proxy_url,
+                    "https": proxy_url
+                }
+                _LOGGER.info("已配置HTTP代理: %s", proxy_url)
+            else:
+                _LOGGER.warning("代理URL格式无效，将不使用代理: %s", proxy_url)
     
     async def get_access_token(self):
-        """获取或刷新Access Token"""
+        """获取或刷新Access Token（支持代理）"""
         if self.access_token and time.time() < self.token_expire - 60:
             return self.access_token
             
         url = f"{API_BASE}/gettoken?corpid={self.config['corp_id']}&corpsecret={self.config['secret']}"
-        response = await self.hass.async_add_executor_job(requests.get, url)
         
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("errcode") == 0:
-                self.access_token = data["access_token"]
-                self.token_expire = time.time() + data["expires_in"]
-                return self.access_token
+        _LOGGER.debug("获取Access Token，URL: %s, 代理: %s", url, self.proxies)
         
-        _LOGGER.error("获取Access Token失败: %s", response.text)
+        def _get_token():
+            try:
+                response = requests.get(url, proxies=self.proxies, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("errcode") == 0:
+                        _LOGGER.debug("成功获取Access Token，有效期: %s秒", data["expires_in"])
+                        return data
+                    else:
+                        _LOGGER.error("企业微信API错误: errcode=%s, errmsg=%s", 
+                                     data.get("errcode"), data.get("errmsg"))
+                else:
+                    _LOGGER.error("获取Access Token失败，HTTP状态码: %s", response.status_code)
+            except requests.exceptions.Timeout:
+                _LOGGER.error("获取Access Token请求超时")
+            except requests.exceptions.RequestException as e:
+                _LOGGER.error("获取Access Token网络异常: %s", str(e))
+            return None
+        
+        data = await self.hass.async_add_executor_job(_get_token)
+        
+        if data and data.get("errcode") == 0:
+            self.access_token = data["access_token"]
+            self.token_expire = time.time() + data["expires_in"]
+            return self.access_token
+        
+        _LOGGER.error("获取Access Token失败")
         return None
     
     async def setup_callback(self):
         """注册回调URL"""
-        # 使用配置中的external_url
         external_url = self.config[CONF_EXTERNAL_URL]
         if not external_url.endswith('/'):
             external_url += '/'
         
         callback_url = f"{external_url}api/workchat_callback/{self.config['token']}"
-        self.callback_url = callback_url  # 存储回调URL
+        self.callback_url = callback_url
         
-        _LOGGER.debug("生成的回调URL: %s", callback_url)
-        _LOGGER.debug("配置参数 - Token: %s, AES Key: %s", 
-                     self.config["token"], self.config["aes_key"])
-        
-        _LOGGER.info("请在企微通后台设置回调URL: %s", callback_url)
+        _LOGGER.info("回调URL已配置: %s", callback_url)
+        _LOGGER.info("代理设置: %s", "已启用" if self.proxies else "未启用")
         
         self.hass.http.register_view(WorkChatCallbackView(self))
     
@@ -177,12 +207,14 @@ class WorkChatClient:
         )
     
     async def upload_media_file(self, media_type, file_path, file_name=None):
-        """上传媒体文件到企微通"""
+        """上传媒体文件到企微通（支持代理）"""
         access_token = await self.get_access_token()
         if not access_token:
             raise Exception("无法获取Access Token")
         
         url = f"{API_BASE}/media/upload?access_token={access_token}&type={media_type}"
+        
+        _LOGGER.debug("上传媒体文件，URL: %s, 代理: %s", url, self.proxies)
         
         def _perform_upload():
             if not os.path.exists(file_path):
@@ -191,24 +223,28 @@ class WorkChatClient:
             file_size = os.path.getsize(file_path)
             max_size = 10 * 1024 * 1024  # 10MB
             if file_size > max_size:
-                raise ValueError(f"文件过大 ({file_size/(1024*1024):.2f}MB)，最大支持10MB")
+                raise ValueError(f"文件过大 ({file_size/(1024 * 1024):.2f}MB)，最大支持10MB")
             
             filename = file_name or os.path.basename(file_path)
             
             with open(file_path, "rb") as file:
                 files = {"media": (filename, file)}
-                response = requests.post(url, files=files)
+                response = requests.post(url, files=files, 
+                                       proxies=self.proxies, timeout=30)
                 return response, filename
         
         try:
             result = await self.hass.async_add_executor_job(_perform_upload)
             response, filename = result
+        except requests.exceptions.RequestException as e:
+            _LOGGER.error("文件上传网络异常: %s", str(e))
+            raise Exception(f"网络异常: {str(e)}")
         except Exception as e:
-            _LOGGER.error("文件上传请求失败: %s", str(e))
+            _LOGGER.error("文件上传失败: %s", str(e))
             raise
         
         if response.status_code != 200:
-            error_msg = f"上传失败，状态码: {response.status_code}"
+            error_msg = f"上传失败，HTTP状态码: {response.status_code}"
             _LOGGER.error(error_msg)
             raise Exception(error_msg)
         
@@ -223,7 +259,7 @@ class WorkChatClient:
             _LOGGER.error("未返回有效的media_id")
             raise Exception("未返回有效的media_id")
         
-        _LOGGER.debug("媒体文件上传成功，media_id: %s", media_id)
+        _LOGGER.info("媒体文件上传成功，media_id: %s", media_id)
         
         # 触发媒体上传事件
         self.hass.bus.async_fire("workchat_media_uploaded", {
@@ -237,7 +273,7 @@ class WorkChatClient:
         return media_id
     
     async def send_message(self, **kwargs):
-        """发送消息到企微通"""
+        """发送消息到企微通（支持代理）"""
         access_token = await self.get_access_token()
         if not access_token: 
             _LOGGER.error("无法获取有效的Access Token")
@@ -250,30 +286,20 @@ class WorkChatClient:
             "msgtype": msg_type
         }
         
+        # 根据消息类型构建payload
         if msg_type == "text":
             payload["text"] = {"content": kwargs["message"]}
-            
         elif msg_type == "image":
             payload["image"] = {"media_id": kwargs["media_id"]}
-            
-        elif msg_type == "video":
-            payload["video"] = {
-                "media_id": kwargs["media_id"],
-                "title": kwargs.get("title", ""),
-                "description": kwargs.get("description", "")
-            }
-            
         elif msg_type == "file":
             payload["file"] = {"media_id": kwargs["media_id"]}
-            
         elif msg_type == "textcard":
             payload["textcard"] = {
                 "title": kwargs["title"],
                 "description": kwargs["message"],
                 "url": kwargs["url"],
-                "btnttxt": kwargs.get("btnttxt", "详情")
+                "btntxt": kwargs.get("btntxt", "详情")
             }
-            
         elif msg_type == "news":
             articles = kwargs.get("articles", [])
             if not articles and kwargs.get("title"):
@@ -284,14 +310,24 @@ class WorkChatClient:
                     "picurl": kwargs.get("picurl", "")
                 }]
             payload["news"] = {"articles": articles}
+        elif msg_type == "markdown":
+            payload["markdown"] = {"content": kwargs["message"]}
+        elif msg_type == "voice":
+            payload["voice"] = {"media_id": kwargs["media_id"]}
+        elif msg_type == "video":
+            payload["video"] = {
+                "media_id": kwargs["media_id"],
+                "title": kwargs.get("title", ""),
+                "description": kwargs.get("description", "")
+            }
         
-        _LOGGER.debug("准备发送消息到企微通，类型: %s", msg_type)
-        _LOGGER.debug("消息负载: %s", payload)
+        _LOGGER.debug("准备发送消息到企微通，类型: %s, 代理: %s", msg_type, self.proxies)
         
         def _send_request():
             try:
                 url = f"{API_BASE}/message/send?access_token={access_token}"
-                response = requests.post(url, json=payload, timeout=10)
+                response = requests.post(url, json=payload, 
+                                        proxies=self.proxies, timeout=10)
                 return response
             except requests.exceptions.Timeout:
                 _LOGGER.error("请求超时")
@@ -370,7 +406,6 @@ class WorkChatClient:
             _LOGGER.error("XML解析失败: %s", str(e))
             return "XML解析失败", 400
         
-        # 获取公共字段
         msg_type = xml_tree.find("MsgType").text
         user_id = xml_tree.find("FromUserName").text
         create_time = int(xml_tree.find("CreateTime").text)
@@ -383,7 +418,6 @@ class WorkChatClient:
             "agent_id": agent_id
         }
         
-        # 根据消息类型解析特定字段 - 新增菜单点击事件处理
         if msg_type == "text":
             event_data["content"] = xml_tree.find("Content").text
         elif msg_type == "image":
@@ -399,16 +433,15 @@ class WorkChatClient:
             event_data["lon"] = location_y
             event_data["scale"] = float(scale) if scale else None
             event_data["label"] = label
-        elif msg_type == "event":  # 处理事件类型
+        elif msg_type == "event":
             event_type = xml_tree.find("Event").text
-            if event_type == "click":  # 菜单点击事件
+            if event_type == "click":
                 event_key = xml_tree.find("EventKey").text
                 event_data.update({
-                    "type": "menu_click",  # 使用特殊类型标识菜单点击
-                    "event_key": event_key  # 添加event_key字段
+                    "type": "menu_click",
+                    "event_key": event_key
                 })
         
-        # 触发事件
         self.hass.bus.async_fire("workchat_message", event_data)
         
         return self._generate_response("success")

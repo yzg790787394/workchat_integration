@@ -68,6 +68,14 @@ docker run -d \
   ubuntu/squid:latest
 ```
 
+Docker部署Squid的squid.conf配置推荐如下（原配置代理报错）
+```bash
+# 最简单的Squid代理配置
+http_port 3128
+acl all src all
+http_access allow all
+cache deny all
+```
 **方案B：使用tinyproxy代理（更轻量）**
 
 ```bash

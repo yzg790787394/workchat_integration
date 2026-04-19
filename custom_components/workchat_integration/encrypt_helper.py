@@ -24,6 +24,7 @@ class EncryptHelper:
 
     def Encrypt(self, data):
         """加密消息 - 企业微信官方方案"""
+        _LOGGER.debug("加密原始数据: %s", data[:100] + "..." if len(data) > 100 else data)
         try:
             # 生成16字节随机字符串
             import random
@@ -36,6 +37,9 @@ class EncryptHelper:
             receive_id = self.token.encode('utf-8')
             plaintext = random_str.encode('utf-8') + msg_len + msg_bytes + receive_id
             
+            _LOGGER.debug("加密: 随机字符串=%s, 消息长度=%d, 企业ID=%s", 
+                         random_str, len(msg_bytes), self.token)
+            
             # 进行PKCS#7填充
             block_size = AES.block_size
             pad_len = block_size - (len(plaintext) % block_size)
@@ -47,6 +51,7 @@ class EncryptHelper:
             cipher = AES.new(self.key, AES.MODE_CBC, iv=iv)
             encrypted = cipher.encrypt(plaintext)
             
+            _LOGGER.debug("加密成功: 结果长度=%d", len(encrypted))
             return base64.b64encode(encrypted).decode('utf-8')
         except Exception as e:
             _LOGGER.error("加密失败: %s", str(e))
@@ -54,6 +59,7 @@ class EncryptHelper:
 
     def Decrypt(self, data):
         """解密消息 - 企业微信官方方案 (修复填充问题)"""
+        _LOGGER.debug("解密数据: %s...", data[:50])
         try:
             # 增加空值检查
             if not data:
@@ -61,6 +67,7 @@ class EncryptHelper:
                 
             # Base64解码
             encrypted_data = base64.b64decode(data)
+            _LOGGER.debug("解密: Base64解码后长度=%d", len(encrypted_data))
             
             # AES-CBC解密
             iv = self.key[:16]
@@ -78,10 +85,16 @@ class EncryptHelper:
             else:
                 # 标准PKCS#7填充移除
                 decrypted = decrypted[:-pad_len]
+                
+            _LOGGER.debug("移除填充: pad_len=%d, 移除后长度=%d", pad_len, len(decrypted))
             
             # 解析结构: [随机16B][消息长度4B][消息体][企业ID]
             msg_len = struct.unpack('>I', decrypted[16:20])[0]
             content = decrypted[20:20+msg_len].decode('utf-8')
+            
+            _LOGGER.debug("解析消息结构: 随机字符串长度=%d, 消息长度=%d, 实际消息长度=%d", 
+                         16, msg_len, len(content))
+            _LOGGER.debug("解密成功: 内容=%s", content[:100] + "..." if len(content) > 100 else content)
             
             return content
         except Exception as e:

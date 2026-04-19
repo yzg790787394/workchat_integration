@@ -158,17 +158,32 @@ class WorkChatClient:
     async def setup_callback(self):
         """注册回调URL"""
         external_url = self.config[CONF_EXTERNAL_URL]
+    
+        # 清理external_url，移除可能存在的重复回调路径
+        token = self.config["token"]
+        callback_suffix = f"api/workchat_callback/{token}"
+    
+        # 如果external_url已经以回调路径结尾，先移除它
+        if external_url.rstrip('/').endswith(callback_suffix.rstrip('/')):
+            # 找到回调路径的位置
+            index = external_url.rfind(callback_suffix)
+            if index != -1:
+                # 保留回调路径之前的部分
+                external_url = external_url[:index]
+    
+        # 确保URL格式正确
+        external_url = external_url.rstrip('/')
         if not external_url.endswith('/'):
             external_url += '/'
-        
-        callback_url = f"{external_url}api/workchat_callback/{self.config['token']}"
+    
+        callback_url = f"{external_url}api/workchat_callback/{token}"
         self.callback_url = callback_url
-        
+    
+        _LOGGER.info("外部URL已清理: %s", external_url)
         _LOGGER.info("回调URL已配置: %s", callback_url)
         _LOGGER.info("代理设置: %s", "已启用" if self.proxies else "未启用")
-        
-        self.hass.http.register_view(WorkChatCallbackView(self))
     
+        self.hass.http.register_view(WorkChatCallbackView(self))
     async def remove_callback(self):
         """清理回调"""
         pass

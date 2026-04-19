@@ -14,8 +14,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         from homeassistant.helpers.network import get_url
         config_data[CONF_EXTERNAL_URL] = get_url(hass, prefer_external=True)
     
-    # 延迟导入WorkChatClient以避免循环导入
+    # 注意：WorkChatClient的导入必须在函数内部，避免循环导入
     from .workchat_client import WorkChatClient
+    
+    # 验证加密模块是否可用
+    try:
+        from .encrypt_helper import EncryptHelper
+        _LOGGER.debug("EncryptHelper 模块加载成功")
+    except ImportError as e:
+        _LOGGER.error("无法加载EncryptHelper模块: %s", str(e))
+        return False
     
     client = WorkChatClient(hass, config_data)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = client
@@ -34,6 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if entry.data != config_data:
         hass.config_entries.async_update_entry(entry, data=config_data)
     
+    _LOGGER.info("企微通集成设置完成")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

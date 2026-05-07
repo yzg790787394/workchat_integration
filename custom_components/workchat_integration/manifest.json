@@ -4,6 +4,7 @@
   "version": "2026.4.19",
   "config_flow": true,
   "documentation": "https://github.com/yzg790787394/workchat_integration",
+  "issue_tracker": "https://github.com/yzg790787394/workchat_integration/issues",
   "requirements": ["pycryptodome>=3.20.0", "requests>=2.28.1"],
   "dependencies": ["http"],
   "codeowners": ["@yzg790787394"],

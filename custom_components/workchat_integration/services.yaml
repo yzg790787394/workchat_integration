@@ -1,45 +1,39 @@
-# 1. 媒体上传服务 (支持服务响应)
+# 1. 媒体上传服务
 upload_media:
   name: 上传媒体文件
-  description: 上传本地文件到企业微信服务器，并获取用于发送消息的 media_id。
+  description: 上传本地文件到企业微信服务器。注意：HA 必须拥有该路径的访问权限。
   fields:
     type:
       name: 媒体类型
-      description: 企微要求的媒体类型。
       required: true
       default: file
       selector:
         select:
           options:
-            - label: "文件 (file)"
-              value: "file"
-            - label: "图片 (image)"
-              value: "image"
-            - label: "语音 (voice)"
-              value: "voice"
-            - label: "视频 (video)"
-              value: "video"
+            - { label: "文件 (file)", value: "file" }
+            - { label: "图片 (image)", value: "image" }
+            - { label: "语音 (voice)", value: "voice" }
+            - { label: "视频 (video)", value: "video" }
     file_path:
       name: 文件路径
-      description: HA 能够访问的本地文件绝对路径（需在 allowlist_external_dirs 中授权）。
+      description: HA 能够访问的绝对路径。
       required: true
-      example: "/config/www/snapshot.jpg"
+      example: "/config/www/cam_snapshot.jpg"
       selector:
         text:
     file_name:
       name: 自定义文件名
-      description: 发送给企微时的显示文件名。
-      required: false
+      description: 企微接收端显示的文件名（带后缀）。
       selector:
         text:
-  # 标记该服务会返回结果 (HA 2023.7+)
+  # 明确标识返回 media_id
   response:
     optional: false
 
-# 2. 发送通知服务
+# 2. 发送企微通消息
 notify:
   name: 发送企微通消息
-  description: 通过企业微信发送多种格式的消息（支持文本、卡片、图文等）。
+  description: 支持所有企微原生消息格式。
   fields:
     msg_type:
       name: 消息类型
@@ -48,41 +42,40 @@ notify:
       selector:
         select:
           options:
-            - label: "纯文本 (text)"
-              value: "text"
-            - label: "Markdown (markdown)"
-              value: "markdown"
-            - label: "文本卡片 (textcard)"
-              value: "textcard"
-            - label: "图文消息 (news)"
-              value: "news"
-            - label: "图片 (image)"
-              value: "image"
-            - label: "文件 (file)"
-              value: "file"
-            - label: "语音 (voice)"
-              value: "voice"
-            - label: "视频 (video)"
-              value: "video"
+            - { label: "纯文本 (text)", value: "text" }
+            - { label: "Markdown (markdown)", value: "markdown" }
+            - { label: "文本卡片 (textcard)", value: "textcard" }
+            - { label: "模版卡片 (template_card)", value: "template_card" }
+            - { label: "图文消息 (news)", value: "news" }
+            - { label: "图片 (image)", value: "image" }
+            - { label: "文件 (file)", value: "file" }
+            - { label: "语音 (voice)", value: "voice" }
+            - { label: "视频 (video)", value: "video" }
     message:
-      name: 消息内容
-      description: 文本、Markdown 或卡片的主要正文。
+      name: 消息正文
+      description: 文本或卡片的内容。支持换行。
       selector:
         text:
           multiline: true
     title:
       name: 标题
-      description: 用于卡片或视频消息的标题。
+      description: 用于卡片或视频的标题。
       selector:
         text:
+    touser:
+      name: 接收人
+      description: 成员ID列表（|分隔）。默认为配置中的接收人，@all 代表全体。
+      selector:
+        text:
+    
+    # 高级参数
     media_id:
       name: 媒体ID
-      description: 通过 upload_media 服务获取的 ID。
+      description: 图片/文件/视频必填。
       selector:
         text:
     url:
-      name: 跳转链接
-      description: 点击消息后跳转的 URL。
+      name: 点击跳转链接
       selector:
         text:
           type: url
@@ -93,17 +86,17 @@ notify:
         text:
     picurl:
       name: 图片 URL
-      description: 图文消息显示的封面图。
+      description: news 类型显示的封面图。
       selector:
         text:
           type: url
-    touser:
-      name: 接收人
-      description: 指定接收用户 ID，多个用 | 分隔，默认为配置中的用户。
-      selector:
-        text:
     articles:
-      name: 图文列表
-      description: 用于 news 类型，定义多篇图文。
+      name: 图文列表 (高级)
+      description: 用于 news 类型的多篇文章对象。
+      selector:
+        object:
+    template_card_data:
+      name: 模版卡片 JSON 数据
+      description: 用于 template_card 类型的完整配置对象。
       selector:
         object:

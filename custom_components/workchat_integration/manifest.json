@@ -1,16 +1,18 @@
 {
   "domain": "workchat_integration",
   "name": "企微通",
-  "version": "v1.0.0",
+  "version": "1.0.0",
   "config_flow": true,
+  "integration_type": "service",
+  "iot_class": "cloud_push",
   "documentation": "https://github.com/hzonz/workchat_integration",
   "issue_tracker": "https://github.com/hzonz/workchat_integration/issues",
   "requirements": [
-    "pycryptodome>=3.20.0"
+    "pycryptodome>=3.21.0",
+    "yarl>=1.18.0"
   ],
-  "dependencies": [],
+  "dependencies": ["http"],
   "codeowners": ["@hzonz"],
-  "iot_class": "cloud_push",
   "loggers": [
     "custom_components.workchat_integration"
   ]

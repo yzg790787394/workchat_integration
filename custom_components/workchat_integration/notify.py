@@ -35,8 +35,7 @@ class WorkChatNotifyEntity(NotifyEntity):
     _attr_has_entity_name = True
     # 建议设置 translation_key，配合 zh-Hans.json 可以翻译为“通知器”
     _attr_translation_key = "workchat_notifier"
-    _attr_name = None 
-    
+    _attr_name = "Notifier"
     _attr_supported_features = NotifyEntityFeature.TITLE
 
     def __init__(self, client, entry) -> None:
@@ -48,7 +47,7 @@ class WorkChatNotifyEntity(NotifyEntity):
         agent_id = entry.data.get("agent_id")
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            name=f"企微通 ({agent_id})",
+            name=f"WorkChat App ({agent_id})",
             manufacturer="Tencent",
             model="WorkChat Integration",
             configuration_url=f"https://work.weixin.qq.com/wework_admin/frame#apps/modApiApp/{agent_id}",

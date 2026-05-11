@@ -1,8 +1,8 @@
 # Home Assistant 企微通集成 v2.0.0
 
-https://img.shields.io/github/v/release/yzg790787394/workchat_integration](https://github.com/yzg790787394/workchat_integration/releases)
-https://img.shields.io/badge/License-MIT-yellow.svg](https://github.com/yzg790787394/workchat_integration/blob/main/LICENSE)
-https://img.shields.io/badge/HACS-Custom-orange.svg](https://github.com/hacs/integration)
+[![Release](https://img.shields.io/github/v/release/yzg790787394/workchat_integration)](https://github.com/yzg790787394/workchat_integration/releases)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/yzg790787394/workchat_integration/blob/main/LICENSE)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
 企微通集成允许Home Assistant与企业微信（WorkChat）无缝集成，实现双向通信功能。v2.0.0版本新增代理支持，解决动态IP环境下的可信IP问题。
 
@@ -115,7 +115,7 @@ docker run -d \
    - **代理地址**（可选）：HTTP代理地址，格式如`http://您的VPS_IP:3128`
 5. 点击 **提交** 完成配置
 
-!https://github.com/yzg790787394/workchat_integration/blob/main/docs/config_interface.jpg
+![配置界面](https://github.com/yzg790787394/workchat_integration/blob/main/docs/config_interface.jpg)
 
 ### 步骤4：设置企业微信回调
 
@@ -131,7 +131,7 @@ docker run -d \
    - **EncodingAESKey**：与配置中相同的EncodingAESKey
 6. 保存设置并启用
 
-!https://github.com/yzg790787394/workchat_integration/blob/main/docs/callback_url.jpg
+![回调URL配置](https://github.com/yzg790787394/workchat_integration/blob/main/docs/callback_url.jpg)
 
 ## 🚀 服务使用
 
@@ -241,7 +241,7 @@ data:
 }
 ```
 
-!https://github.com/yzg790787394/workchat_integration/blob/main/docs/media_upload.jpg
+![媒体上传示例](https://github.com/yzg790787394/workchat_integration/blob/main/docs/media_upload.jpg)
 
 ## 🔍 传感器
 
@@ -254,7 +254,7 @@ data:
   - 时间：消息时间戳
   - 内容：完整消息内容
 
-!https://github.com/yzg790787394/workchat_integration/blob/main/docs/text_message.jpg
+![文本消息传感器](https://github.com/yzg790787394/workchat_integration/blob/main/docs/text_message.jpg)
 
 ### 2. 企微通图片消息传感器
 - **状态**：媒体文件ID
@@ -264,7 +264,7 @@ data:
   - 图片URL：图片访问地址
   - 媒体ID：媒体文件ID
 
-!https://github.com/yzg790787394/workchat_integration/blob/main/docs/image_message.jpg
+![图片消息传感器](https://github.com/yzg790787394/workchat_integration/blob/main/docs/image_message.jpg)
 
 ### 3. 企微通位置消息传感器
 - **状态**：位置标签
@@ -276,7 +276,7 @@ data:
   - 缩放级别：地图缩放比例
   - 位置标签：位置描述
 
-!https://github.com/yzg790787394/workchat_integration/blob/main/docs/location_message.jpg
+![位置消息传感器](https://github.com/yzg790787394/workchat_integration/blob/main/docs/location_message.jpg)
 
 ### 4. 企微通回调URL信息传感器
 - **状态**：配置状态

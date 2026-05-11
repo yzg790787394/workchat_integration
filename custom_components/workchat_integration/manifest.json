@@ -2,6 +2,7 @@
   "domain": "workchat_integration",
   "name": "企微通",
   "version": "1.0.0",
+  "homeassistant": "2024.4.0",
   "config_flow": true,
   "integration_type": "service",
   "iot_class": "cloud_push",

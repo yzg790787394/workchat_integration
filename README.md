@@ -115,7 +115,7 @@ docker run -d \
    - **代理地址**（可选）：HTTP代理地址，格式如`http://您的VPS_IP:3128`
 5. 点击 **提交** 完成配置
 
-![配置界面](https://github.com/yzg790787394/workchat_integration/main/img/配置界面.jpg)
+![配置界面](img/配置界面.jpg)
 
 ### 步骤4：设置企业微信回调
 
@@ -131,7 +131,7 @@ docker run -d \
    - **EncodingAESKey**：与配置中相同的EncodingAESKey
 6. 保存设置并启用
 
-![回调URL配置](https://github.com/yzg790787394/workchat_integration/main/img/回调url.jpg)
+![回调URL配置](img/回调url.jpg)
 
 ## 🚀 服务使用
 
@@ -241,7 +241,7 @@ data:
 }
 ```
 
-![媒体上传示例](https://github.com/yzg790787394/workchat_integration/main/img/媒体上传信息.jpg)
+![媒体上传示例](img/媒体上传信息.jpg)
 
 ## 🔍 传感器
 
@@ -254,7 +254,7 @@ data:
   - 时间：消息时间戳
   - 内容：完整消息内容
 
-![文本消息传感器](https://github.com/yzg790787394/workchat_integration/main/img/文本消息.jpg)
+![文本消息传感器](img/文本消息.jpg)
 
 ### 2. 企微通图片消息传感器
 - **状态**：媒体文件ID
@@ -264,7 +264,7 @@ data:
   - 图片URL：图片访问地址
   - 媒体ID：媒体文件ID
 
-![图片消息传感器](https://github.com/yzg790787394/workchat_integration/main/img/图片消息.jpg)
+![图片消息传感器](img/图片消息.jpg)
 
 ### 3. 企微通位置消息传感器
 - **状态**：位置标签
@@ -276,7 +276,7 @@ data:
   - 缩放级别：地图缩放比例
   - 位置标签：位置描述
 
-![位置消息传感器](https://github.com/yzg790787394/workchat_integration/main/img/位置消息.jpg)
+![位置消息传感器](img/位置消息.jpg)
 
 ### 4. 企微通回调URL信息传感器
 - **状态**：配置状态

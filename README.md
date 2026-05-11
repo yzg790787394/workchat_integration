@@ -1,7 +1,7 @@
 # 企微通 (WorkChat Integration)
 
-[![Release](https://img.shields.io/github/v/release/zonz/workchat_integration)](https://github.com/zonz/workchat_integration/releases)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/zonz/workchat_integration/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/zonz/workchat_integration)](https://github.com/hzonz/workchat_integration/releases)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/hzonz/workchat_integration/blob/main/LICENSE)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
 ## 企微通是一个专为 Home Assistant 设计的企业微信（企微）深度集成插件。通过企业微信自建应用，实现安全、可靠的双向通信。它不仅能推送复杂的通知卡片，还能将你的企微作为远程控制终端，实时监控家居状态。

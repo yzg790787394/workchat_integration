@@ -3,34 +3,61 @@
     "step": {
       "user": {
         "title": "WorkChat Config",
-        "description": "Enter your Enterprise WeChat Application details.",
+        "description": "Enter your Enterprise WeChat (WorkChat) application details.",
         "data": {
           "corp_id": "Corp ID",
           "secret": "Secret",
           "agent_id": "Agent ID",
           "token": "Token",
           "aes_key": "EncodingAESKey",
-          "receive_user": "Default User",
-          "external_url": "HA External URL",
-          "proxy": "Proxy (Optional)"
+          "receive_user": "Default Receiver",
+          "external_url": "Webhook URL",
+          "proxy": "Proxy URL (Optional)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Connection failed",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unknown error"
+      "cannot_connect": "Failed to connect to WorkChat server",
+      "invalid_auth": "Authentication failed, please check Corp ID and Secret",
+      "invalid_proxy_format": "Proxy format invalid, must start with http:// or https://",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "This application (Agent ID) is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Modify WorkChat Settings",
+        "title": "Configure WorkChat Options",
         "data": {
-          "receive_user": "Default User",
-          "proxy": "Proxy"
+          "receive_user": "Default Receiver",
+          "proxy": "Proxy URL"
         }
       }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "text_msg": { "name": "Text Message" },
+      "image_msg": { "name": "Image Message" },
+      "location_msg": { "name": "Location Message" },
+      "menu_click": { "name": "Menu Interaction" },
+      "callback_status": { "name": "Callback Status" },
+      "media_upload": { "name": "Media Upload" }
+    },
+    "notify": {
+      "workchat_notifier": { "name": "Notification Assistant" }
+    }
+  },
+  "services": {
+    "notify": {
+      "name": "Send message",
+      "description": "Send various types of messages via WorkChat."
+    },
+    "upload_media": {
+      "name": "Upload media",
+      "description": "Upload a local file and return a media_id."
     }
   }
 }

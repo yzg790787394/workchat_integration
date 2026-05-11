@@ -1,4 +1,4 @@
-"""企业微信加解密助手 - HA 2026 优化版."""
+"""企业微信加解密助手."""
 from __future__ import annotations
 
 import base64

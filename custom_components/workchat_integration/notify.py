@@ -1,4 +1,4 @@
-"""企微通通知平台实现 (适配最新通知实体规范)."""
+"""企微通通知实体实现 (适配最新规范)."""
 from __future__ import annotations
 
 import logging
@@ -6,7 +6,6 @@ from typing import Any
 
 from homeassistant.components.notify import (
     ATTR_DATA,
-    ATTR_TITLE,
     NotifyEntity,
     NotifyEntityFeature,
 )
@@ -25,49 +24,51 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """设置企微通通知实体入口."""
-    # 从 runtime_data 获取 client
     client = entry.runtime_data
     
-    # 添加通知实体
+    # 实体化通知平台不再需要 async_load_platform
     async_add_entities([WorkChatNotifyEntity(client, entry)])
 
 class WorkChatNotifyEntity(NotifyEntity):
     """企微通通知实体类."""
 
     _attr_has_entity_name = True
-    _attr_name = None  # 实体名称将继承自设备名称
+    # 建议设置 translation_key，配合 zh-Hans.json 可以翻译为“通知器”
+    _attr_translation_key = "workchat_notifier"
+    _attr_name = None 
     
-    # 声明支持的特性（通知实体必须声明）
     _attr_supported_features = NotifyEntityFeature.TITLE
 
     def __init__(self, client, entry) -> None:
         """初始化."""
         self.client = client
         self.entry = entry
-        
-        # 唯一 ID
         self._attr_unique_id = f"{entry.entry_id}_notify"
         
-        # 设备信息聚合
+        agent_id = entry.data.get("agent_id")
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            name=f"企微通 ({entry.data.get('agent_id')})",
+            name=f"企微通 ({agent_id})",
             manufacturer="Tencent",
             model="WorkChat Integration",
+            configuration_url=f"https://work.weixin.qq.com/wework_admin/frame#apps/modApiApp/{agent_id}",
         )
 
     async def async_send_message(self, message: str, title: str | None = None, **kwargs: Any) -> None:
         """发送通知消息."""
-        # 合并字段，确保支持 services.yaml 中定义的 data 参数
+        # 合并字段
         data = kwargs.get(ATTR_DATA) or {}
         
+        # 构造发送参数
         params = {
             "message": message,
             "title": title,
-            **data  # 透传 msg_type, media_id, url, touser 等
+            **data
         }
         
-        _LOGGER.debug("正在通过通知实体发送企微消息: %s", params)
-        
-        # 调用 client 中的发送逻辑
-        await self.client.send_message(**params)
+        try:
+            success = await self.client.send_message(**params)
+            if not success:
+                _LOGGER.error("企微消息发送失败，请检查 client 日志")
+        except Exception as err:
+            _LOGGER.exception("通过通知实体发送消息时发生崩溃: %s", err)

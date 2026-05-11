@@ -1,18 +1,10 @@
-# Home Assistant 企微通集成 v2.0.0
+# 企微通 (WorkChat Integration)
 
-[![Release](https://img.shields.io/github/v/release/yzg790787394/workchat_integration)](https://github.com/yzg790787394/workchat_integration/releases)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/yzg790787394/workchat_integration/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/zonz/workchat_integration)](https://github.com/zonz/workchat_integration/releases)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/zonz/workchat_integration/blob/main/LICENSE)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
-企微通集成允许Home Assistant与企业微信（WorkChat）无缝集成，实现双向通信功能。v2.0.0版本新增代理支持，解决动态IP环境下的可信IP问题。
-
-## 🆕 v2.0.0 新特性
-
-- ✅ **代理支持**：新增HTTP代理配置，解决动态IP环境下的企业微信可信IP问题
-- ✅ **网络适应性**：支持内网穿透、动态IP、NAT等复杂网络环境
-- ✅ **零信任IP更新**：通过VPS固定IP代理，无需频繁更新企业微信可信IP
-- ✅ **配置简化**：集成代理配置到插件设置，无需额外工具
-- ✅ **向后兼容**：完全兼容旧版本配置，代理功能可选
+## 企微通是一个专为 Home Assistant 设计的企业微信（企微）深度集成插件。通过企业微信自建应用，实现安全、可靠的双向通信。它不仅能推送复杂的通知卡片，还能将你的企微作为远程控制终端，实时监控家居状态。
 
 ## 🌟 功能概览
 
@@ -29,7 +21,7 @@
 
 1. 在HACS的"集成"部分，点击右上角的三点菜单
 2. 选择"自定义存储库"
-3. 在存储库字段输入：`https://github.com/yzg790787394/workchat_integration/custom_components/workchat_integration`
+3. 在存储库字段输入：`https://github.com/hzonz/workchat_integration`
 4. 类别选择"集成"
 5. 点击"添加"保存
 6. 在HACS中找到"企微通"集成并点击安装
@@ -37,7 +29,7 @@
 
 ### 手动安装
 
-1. 下载最新的https://github.com/yzg790787394/workchat_integration/releases
+1. 下载最新的: `https://github.com/hzonz/workchat_integration`
 2. 解压并将`workchat_integration`文件夹放入Home Assistant的`custom_components`目录
 3. 重启Home Assistant
 
@@ -53,53 +45,10 @@
 4. **Token**：用于回调验证的令牌
 5. **EncodingAESKey**：用于消息加密的密钥
 
-### 步骤2：设置代理服务器（可选，针对动态IP环境）
-
-如果您是动态IP环境（如家庭宽带），强烈建议设置代理服务器：
-
-**方案A：使用Docker部署Squid代理（推荐）**
-
-```bash
-# 在您的VPS服务器上执行
-docker run -d \
-  --name squid \
-  --restart always \
-  -p 3128:3128 \
-  ubuntu/squid:latest
-```
-
-Docker部署Squid的squid.conf配置推荐如下（原配置代理报错）
-```bash
-# 最简单的Squid代理配置
-http_port 3128
-acl all src all
-http_access allow all
-cache deny all
-```
-**方案B：使用tinyproxy代理（更轻量）**
-
-```bash
-# 创建配置文件
-cat > /tmp/tinyproxy.conf << 'EOF'
-Port 3128
-Allow 0.0.0.0/0
-Timeout 600
-MaxClients 100
-EOF
-
-# 运行容器
-docker run -d \
-  --name tinyproxy \
-  --restart always \
-  -p 3128:3128 \
-  -v /tmp/tinyproxy.conf:/etc/tinyproxy/tinyproxy.conf \
-  dannydirect/tinyproxy:latest
-```
-
 **配置企业微信可信IP**：
-将您的VPS公网IP添加到企业微信应用的可信IP列表中。
+将您的公网IP添加到企业微信应用的可信IP列表中。
 
-### 步骤3：在Home Assistant中添加集成
+### 步骤2：在Home Assistant中添加集成
 
 1. 进入Home Assistant的 **设置** > **设备与服务** > **集成**
 2. 点击右下角的 **+ 添加集成**
@@ -117,7 +66,7 @@ docker run -d \
 
 ![配置界面](img/配置界面.jpg)
 
-### 步骤4：设置企业微信回调
+### 步骤3：设置企业微信回调
 
 配置完成后，您需要将回调URL设置到企业微信后台：
 
@@ -429,4 +378,4 @@ Home Assistant        FRP客户端        Squid代理(3128端口)
 如果这个项目对您有帮助，请给项目点个Star ⭐！
 
 ---
-**版本**: v2.0.0 | **最后更新**: 2026-04-19 | **兼容版本**: Home Assistant 2024.5+
+**兼容版本**: Home Assistant 2024.5+

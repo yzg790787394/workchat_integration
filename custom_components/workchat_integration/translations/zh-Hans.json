@@ -1,0 +1,53 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "配置企微通",
+        "description": "请输入企业微信自建应用的详细信息。",
+        "data": {
+          "corp_id": "企业 ID (CorpID)",
+          "secret": "应用密钥 (Secret)",
+          "agent_id": "应用 ID (AgentID)",
+          "token": "回调 Token",
+          "aes_key": "EncodingAESKey",
+          "receive_user": "默认接收人",
+          "external_url": "公网回调 URL",
+          "proxy": "代理地址 (可选)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "连接企业微信服务器失败，请检查网络或代理",
+      "invalid_auth": "认证失败，请检查 CorpID 或 Secret 是否填写正确",
+      "invalid_proxy_format": "代理格式错误，必须以 http:// 或 https:// 开头",
+      "unknown": "发生未知错误"
+    },
+    "abort": {
+      "already_configured": "该企业应用 (Agent ID) 已经配置过，请勿重复添加"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "修改企微通设置",
+        "data": {
+          "receive_user": "默认接收人",
+          "proxy": "代理地址"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "text_msg": { "name": "文本消息" },
+      "image_msg": { "name": "图片消息" },
+      "location_msg": { "name": "位置消息" },
+      "menu_click": { "name": "菜单交互" },
+      "callback_info": { "name": "回调状态" },
+      "media_upload": { "name": "媒体上传" }
+    },
+    "notify": {
+      "workchat_notifier": { "name": "通知助手" }
+    }
+  }
+}

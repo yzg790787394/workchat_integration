@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "WorkChat Config",
+        "description": "Enter your Enterprise WeChat Application details.",
+        "data": {
+          "corp_id": "Corp ID",
+          "secret": "Secret",
+          "agent_id": "Agent ID",
+          "token": "Token",
+          "aes_key": "EncodingAESKey",
+          "receive_user": "Default User",
+          "external_url": "HA External URL",
+          "proxy": "Proxy (Optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Connection failed",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unknown error"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Modify WorkChat Settings",
+        "data": {
+          "receive_user": "Default User",
+          "proxy": "Proxy"
+        }
+      }
+    }
+  }
+}

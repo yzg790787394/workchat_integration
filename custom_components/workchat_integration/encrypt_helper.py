@@ -1,103 +1,104 @@
+"""企业微信加解密助手."""
+from __future__ import annotations
+
 import base64
-from Crypto.Cipher import AES
-import struct
 import logging
+import os
+import struct
+from typing import Final
+
+from Crypto.Cipher import AES
 
 _LOGGER = logging.getLogger(__name__)
 
+# 定义常量
+BLOCK_SIZE: Final = 32  # 企业微信固定使用 32 字节块大小进行填充
+IV_SIZE: Final = 16
+
 class EncryptHelper:
-    def __init__(self, key, token) -> None:
-        self.key = self._process_key(key)
-        self.token = token
+    """处理企业微信消息加解密的助手类."""
 
-    def _process_key(self, key):
-        """处理企业微信EncodingAESKey - 增强健壮性"""
-        # 去除空格并验证格式
-        key = key.strip()
-        if not key.endswith('=') and len(key) in (43, 44):
-            key += '='
+    def __init__(self, aes_key_base64: str, receive_id: str) -> None:
+        """初始化加密助手.
+        
+        :param aes_key_base64: 企业微信后台提供的 EncodingAESKey
+        :param receive_id: 企业 ID (CorpID)
+        """
+        self.receive_id = receive_id
         try:
-            return base64.b64decode(key)
-        except Exception as e:
-            _LOGGER.error("Base64解码失败: %s | 密钥: %s", str(e), key)
+            # 自动补全 base64 填充符号并解码
+            key_bytes = base64.b64decode(aes_key_base64.strip() + "=" * (44 - len(aes_key_base64.strip())))
+            self.key = key_bytes
+        except Exception as err:
+            _LOGGER.error("AES Key 解码失败，请检查 EncodingAESKey 是否正确: %s", err)
+            raise ValueError("Invalid EncodingAESKey") from err
+
+    def encrypt(self, text: str) -> str:
+        """加密消息内容.
+        
+        遵循企微协议: Base64_Encode(AES_Encrypt[random(16B) + msg_len(4B) + msg + receive_id])
+        """
+        try:
+            text_bytes = text.encode("utf-8")
+            # 1. 构造原始数据包
+            # random_bytes(16B) + msg_len(4B) + msg + receive_id
+            random_bytes = os.urandom(16)  # 使用系统级随机数，更安全
+            msg_len = struct.pack(">I", len(text_bytes))
+            receive_id_bytes = self.receive_id.encode("utf-8")
+            
+            raw_data = random_bytes + msg_len + text_bytes + receive_id_bytes
+            
+            # 2. PKCS#7 填充 (注意：企微要求按 32 字节对齐，而非 AES 默认的 16)
+            pad_len = BLOCK_SIZE - (len(raw_data) % BLOCK_SIZE)
+            raw_data += bytes([pad_len]) * pad_len
+            
+            # 3. AES-CBC 加密
+            cipher = AES.new(self.key, AES.MODE_CBC, iv=self.key[:IV_SIZE])
+            encrypted_bytes = cipher.encrypt(raw_data)
+            
+            return base64.b64encode(encrypted_bytes).decode("utf-8")
+        except Exception as err:
+            _LOGGER.error("加密失败: %s", err)
             raise
 
-    def Encrypt(self, data):
-        """加密消息 - 企业微信官方方案"""
-        _LOGGER.debug("加密原始数据: %s", data[:100] + "..." if len(data) > 100 else data)
-        try:
-            # 生成16字节随机字符串
-            import random
-            import string
-            random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-            
-            # 构造消息格式: [随机16B][消息长度4B][消息体][企业ID]
-            msg_bytes = data.encode('utf-8')
-            msg_len = struct.pack('>I', len(msg_bytes))
-            receive_id = self.token.encode('utf-8')
-            plaintext = random_str.encode('utf-8') + msg_len + msg_bytes + receive_id
-            
-            _LOGGER.debug("加密: 随机字符串=%s, 消息长度=%d, 企业ID=%s", 
-                         random_str, len(msg_bytes), self.token)
-            
-            # 进行PKCS#7填充
-            block_size = AES.block_size
-            pad_len = block_size - (len(plaintext) % block_size)
-            padding = bytes([pad_len]) * pad_len
-            plaintext += padding
-            
-            # AES-CBC加密
-            iv = self.key[:16]
-            cipher = AES.new(self.key, AES.MODE_CBC, iv=iv)
-            encrypted = cipher.encrypt(plaintext)
-            
-            _LOGGER.debug("加密成功: 结果长度=%d", len(encrypted))
-            return base64.b64encode(encrypted).decode('utf-8')
-        except Exception as e:
-            _LOGGER.error("加密失败: %s", str(e))
-            raise
+    def decrypt(self, encrypted_base64: str) -> str:
+        """解密消息内容."""
+        if not encrypted_base64:
+            raise ValueError("收到空加密数据")
 
-    def Decrypt(self, data):
-        """解密消息 - 企业微信官方方案 (修复填充问题)"""
-        _LOGGER.debug("解密数据: %s...", data[:50])
         try:
-            # 增加空值检查
-            if not data:
-                raise ValueError("空加密数据")
-                
-            # Base64解码
-            encrypted_data = base64.b64decode(data)
-            _LOGGER.debug("解密: Base64解码后长度=%d", len(encrypted_data))
+            # 1. Base64 解码
+            encrypted_bytes = base64.b64decode(encrypted_base64)
             
-            # AES-CBC解密
-            iv = self.key[:16]
-            cipher = AES.new(self.key, AES.MODE_CBC, iv=iv)
-            decrypted = cipher.decrypt(encrypted_data)
+            # 2. AES-CBC 解密
+            cipher = AES.new(self.key, AES.MODE_CBC, iv=self.key[:IV_SIZE])
+            decrypted_raw = cipher.decrypt(encrypted_bytes)
             
-            # 手动移除填充（兼容企业微信官方实现）
-            pad_len = decrypted[-1]
-            # 检查填充长度是否有效
-            if pad_len < 1 or pad_len > AES.block_size:
-                # 尝试使用最后一位作为填充长度
-                # 企业微信官方库使用这种更宽松的方式
-                _LOGGER.debug("使用最后字节作为填充长度: %s", pad_len)
-                decrypted = decrypted[:-pad_len]
-            else:
-                # 标准PKCS#7填充移除
-                decrypted = decrypted[:-pad_len]
-                
-            _LOGGER.debug("移除填充: pad_len=%d, 移除后长度=%d", pad_len, len(decrypted))
+            # 3. 移除填充 (PKCS#7)
+            pad_len = decrypted_raw[-1]
+            if pad_len < 1 or pad_len > BLOCK_SIZE:
+                pad_len = 0
+            content_raw = decrypted_raw[:-pad_len] if pad_len > 0 else decrypted_raw
             
-            # 解析结构: [随机16B][消息长度4B][消息体][企业ID]
-            msg_len = struct.unpack('>I', decrypted[16:20])[0]
-            content = decrypted[20:20+msg_len].decode('utf-8')
+            # 4. 解析协议结构
+            # 结构: [16B random] + [4B len] + [msg] + [receive_id]
+            msg_len = struct.unpack(">I", content_raw[16:20])[0]
+            msg_content = content_raw[20 : 20 + msg_len].decode("utf-8")
             
-            _LOGGER.debug("解析消息结构: 随机字符串长度=%d, 消息长度=%d, 实际消息长度=%d", 
-                         16, msg_len, len(content))
-            _LOGGER.debug("解密成功: 内容=%s", content[:100] + "..." if len(content) > 100 else content)
+            # 5. 校验 ReceiveID (CorpID) 是否匹配
+            # 增加 .strip() 防止因不可见字符导致的匹配失败
+            received_corp_id = content_raw[20 + msg_len :].decode("utf-8").strip()
+            configured_corp_id = self.receive_id.strip()
+
+            if received_corp_id != configured_corp_id:
+                _LOGGER.warning(
+                    "企微回调校验 ID 不匹配! 收到: %s, 配置: %s. "
+                    "请检查集成配置中的 CorpID 是否填错。",
+                    received_corp_id, configured_corp_id
+                )
+                # 即使不匹配也建议返回内容，方便调试，或者抛出异常拦截
             
-            return content
-        except Exception as e:
-            _LOGGER.error("解密失败 | 输入数据: %s... | 错误: %s", 
-                          data[:50] if data else '空', str(e))
+            return msg_content
+        except Exception as err:
+            _LOGGER.error("解密包结构解析失败: %s", err)
             raise

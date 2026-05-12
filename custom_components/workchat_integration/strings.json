@@ -23,7 +23,8 @@
       "unknown": "Unexpected error occurred"
     },
     "abort": {
-      "already_configured": "This application (Agent ID) is already configured."
+      "already_configured": "This application (Agent ID) is already configured.",
+      "reconfigure_successful": "Reconfiguration successful"
     }
   },
   "options": {

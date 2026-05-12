@@ -98,7 +98,7 @@ data:
 
 **文本消息**
 ```yaml
-service: workchat_integration.notify
+action: workchat_integration.notify
 data:
   msg_type: text
   message: "客厅温度过高！当前温度: {{ states('sensor.living_room_temperature') }}℃"
@@ -106,7 +106,7 @@ data:
 
 **图片消息**
 ```yaml
-service: workchat_integration.notify
+action: workchat_integration.notify
 data:
   msg_type: image
   media_id: "1Yv-zXfHjSjU-7LH-GwtYqDGS"
@@ -115,7 +115,7 @@ data:
 
 **卡片消息**
 ```yaml
-service: workchat_integration.notify
+action: workchat_integration.notify
 data:
   msg_type: textcard
   title: "安防通知"
@@ -126,7 +126,7 @@ data:
 
 **图文消息**
 ```yaml
-service: workchat_integration.notify
+action: workchat_integration.notify
 data:
   msg_type: news
   articles:
@@ -142,7 +142,7 @@ data:
 **模板消息**
 
 ****基础传感器报表****
-```
+```yaml
 action: workchat_integration.notify
 data:
   msg_type: template_card
@@ -173,7 +173,7 @@ data:
 ```
 
 ****安防警报****
-```
+```yaml
 action: workchat_integration.notify
 data:
   msg_type: template_card
@@ -196,7 +196,7 @@ data:
 ```
 
 ****自动化示例****
-```
+```yaml
 action: workchat_integration.notify
 data:
   msg_type: template_card
@@ -239,7 +239,7 @@ data:
 
 #### 上传示例
 ```yaml
-service: workchat_integration.upload_media
+action: workchat_integration.upload_media
 data:
   type: image
   file_path: "/config/www/living_room_snapshot.jpg"

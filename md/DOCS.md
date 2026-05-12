@@ -59,7 +59,7 @@
 通过`notify.send_message`服务发送消息到企业微信。
 
 #### 示例
-```
+```yaml
 action: notify.send_message
 data:
   message: 你好

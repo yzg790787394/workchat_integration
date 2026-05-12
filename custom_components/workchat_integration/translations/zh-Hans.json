@@ -23,7 +23,8 @@
       "unknown": "发生未知错误"
     },
     "abort": {
-      "already_configured": "该企业应用 (Agent ID) 已经配置过，请勿重复添加"
+      "already_configured": "该企业应用 (Agent ID) 已经配置过，请勿重复添加",
+      "reconfigure_successful": "重新配置成功"
     }
   },
   "options": {

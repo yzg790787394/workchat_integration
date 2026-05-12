@@ -1,4 +1,4 @@
-# <img src="custom_components/workchat_integration/brand/icon.png" width="32"> 企微通 (WorkChat Integration)
+# <img src="custom_components/workchat_integration/brand/icon.png" width="64"> 企微通 (WorkChat Integration)
 
 [![Release](https://img.shields.io/github/v/release/hzonz/workchat_integration)](https://github.com/hzonz/workchat_integration/releases)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/hzonz/workchat_integration/blob/main/LICENSE)

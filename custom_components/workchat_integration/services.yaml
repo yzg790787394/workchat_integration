@@ -1,42 +1,47 @@
 # 1. 媒体上传服务
 upload_media:
   name: 上传媒体文件
-  description: 上传本地文件到企业微信服务器。注意：HA 必须拥有该路径的访问权限。
+  description: >
+    将本地文件上传到企业微信服务器暂存（有效期3天）。
+    上传成功的 media_id 可用于后续发送图片、文件、语音或视频消息。
+    注意：HA 必须拥有该路径的访问权限。
   fields:
     type:
       name: 媒体类型
+      description: 企微要求的资源分类。图片/语音/视频有格式限制，文件(file)最为通用。
       required: true
       default: file
       selector:
         select:
           options:
-            - { label: "文件 (file)", value: "file" }
-            - { label: "图片 (image)", value: "image" }
-            - { label: "语音 (voice)", value: "voice" }
-            - { label: "视频 (video)", value: "video" }
+            - { label: "图片 (image) - 支持JPG/PNG, 2MB内", value: "image" }
+            - { label: "语音 (voice) - 支持AMR, 2MB内", value: "voice" }
+            - { label: "视频 (video) - 支持MP4, 10MB内", value: "video" }
+            - { label: "普通文件 (file) - 任意格式, 20MB内", value: "file" }
     file_path:
       name: 文件路径
-      description: HA 能够访问的绝对路径。
+      description: 文件的本地绝对路径。如果使用 Docker，请确保路径已映射进容器。
       required: true
       example: "/config/www/cam_snapshot.jpg"
       selector:
         text:
     file_name:
       name: 自定义文件名
-      description: 企微接收端显示的文件名（带后缀）。
+      description: 接收方看到的文件名称（建议带上后缀，如 report.pdf）。
+      required: false
       selector:
         text:
-  # 明确标识返回 media_id
   response:
     optional: false
 
 # 2. 发送企微通消息
 notify:
   name: 发送企微通消息
-  description: 支持所有企微原生消息格式。
+  description: 通过自建应用推送各类富媒体消息。支持发送给特定用户或全体成员。
   fields:
     msg_type:
       name: 消息类型
+      description: 决定消息的呈现方式。不同类型需要配合下方不同的参数使用。
       required: true
       default: text
       selector:
@@ -45,58 +50,71 @@ notify:
             - { label: "纯文本 (text)", value: "text" }
             - { label: "Markdown (markdown)", value: "markdown" }
             - { label: "文本卡片 (textcard)", value: "textcard" }
-            - { label: "模版卡片 (template_card)", value: "template_card" }
-            - { label: "图文消息 (news)", value: "news" }
-            - { label: "图片 (image)", value: "image" }
-            - { label: "文件 (file)", value: "file" }
-            - { label: "语音 (voice)", value: "voice" }
-            - { label: "视频 (video)", value: "video" }
+            - { label: "模版卡片 (template_card) - 交互式", value: "template_card" }
+            - { label: "图文消息 (news) - 带封面", value: "news" }
+            - { label: "图片 (image) - 需 media_id", value: "image" }
+            - { label: "文件 (file) - 需 media_id", value: "file" }
+            - { label: "语音 (voice) - 需 media_id", value: "voice" }
+            - { label: "视频 (video) - 需 media_id", value: "video" }
     message:
       name: 消息正文
-      description: 文本或卡片的内容。支持换行。
+      description: 消息的主要文本内容。在 text、markdown 和 textcard 类型中必填。支持 \n 换行。
       selector:
         text:
           multiline: true
     title:
       name: 标题
-      description: 用于卡片或视频的标题。
+      description: 消息标题。适用于 textcard (文本卡片)、news (图文消息) 和 video (视频)。
       selector:
         text:
     touser:
-      name: 接收人
-      description: 成员ID列表（|分隔）。默认为配置中的接收人，@all 代表全体。
+      name: 指定接收人
+      description: 填入成员 ID（UserID）。多个接收人使用“|”分隔。填写“@all”推送给全员。留空则发送给集成配置中的默认用户。
       selector:
         text:
     
-    # 高级参数
+    # 媒体与链接参数
     media_id:
-      name: 媒体ID
-      description: 图片/文件/视频必填。
+      name: 媒体文件 ID
+      description: 图片、文件、语音或视频消息必填。需先通过“上传媒体文件”服务获取。
       selector:
         text:
     url:
-      name: 点击跳转链接
+      name: 跳转链接
+      description: 点击文本卡片、图文消息或模版卡片后跳转的 URL 地址。
       selector:
         text:
           type: url
     btntxt:
       name: 按钮文字
+      description: 文本卡片底部的详情链接按钮文字，默认为“详情”。
       default: 详情
       selector:
         text:
     picurl:
-      name: 图片 URL
-      description: news 类型显示的封面图。
+      name: 封面图 URL
+      description: 图文消息 (news) 顶部显示的封面图片链接。
       selector:
         text:
           type: url
+
+    # 高级参数组
+    safe:
+      name: 是否保密消息
+      description: 设为 1 时，消息在通知栏隐藏正文且禁止转发。默认为 0。
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 1
+          mode: box
     articles:
       name: 图文列表 (高级)
-      description: 用于 news 类型的多篇文章对象。
+      description: 仅用于 news 类型。支持多篇文章（title, description, url, picurl）。
       selector:
         object:
     template_card_data:
-      name: 模版卡片 JSON 数据
-      description: 用于 template_card 类型的完整配置对象。
+      name: 模版卡片数据 (JSON)
+      description: 仅用于 template_card 类型。填入企微 API 要求的完整卡片对象。
       selector:
         object:

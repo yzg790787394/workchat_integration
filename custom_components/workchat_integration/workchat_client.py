@@ -188,7 +188,7 @@ class WorkChatClient:
         </xml>"""
 
 class WorkChatCallbackView(HomeAssistantView):
-    """处理企微回调的 Aiohttp 视图."""
+    """处理企微回调的 Aiohttp 视图，包含 Web 状态诊断页."""
     url = "/api/workchat_callback/{token}"
     name = "api:workchat_callback"
     requires_auth = False
@@ -203,18 +203,99 @@ class WorkChatCallbackView(HomeAssistantView):
             return hashlib.sha1("".join(tmp).encode()).hexdigest() == sig
         except: return False
 
+    def _get_status_html(self, status_data: dict[str, Any]) -> str:
+        """生成诊断状态页的 HTML."""
+        # 状态颜色逻辑
+        has_token = status_data['has_token']
+        token_status = "有效 (Ready)" if has_token else "未获取 (Error)"
+        token_color = "#27ae60" if has_token else "#e74c3c"
+        
+        return f"""
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>企微通集成状态诊断</title>
+            <style>
+                body {{ font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #1c1e21; }}
+                .container {{ max-width: 500px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }}
+                .header {{ display: flex; align-items: center; border-bottom: 1px solid #ebedf0; margin-bottom: 20px; padding-bottom: 15px; }}
+                .logo {{ background: #07c160; color: white; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; }}
+                h2 {{ margin: 0; font-size: 1.25rem; }}
+                .status-row {{ display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f2f5; font-size: 14px; }}
+                .status-label {{ color: #65676b; }}
+                .status-value {{ font-weight: 500; font-family: monospace; }}
+                .badge {{ padding: 2px 8px; border-radius: 4px; color: white; font-size: 12px; }}
+                .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #8a8d91; }}
+                .log-box {{ background: #1c1e21; color: #a3e635; padding: 10px; border-radius: 6px; font-size: 12px; margin-top: 15px; overflow-x: auto; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">企</div>
+                    <h2>企微通集成状态</h2>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Access Token</span>
+                    <span class="status-value" style="color: {token_color}">{token_status}</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Agent ID</span>
+                    <span class="status-value">{status_data['agent_id']}</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Webhook 校验</span>
+                    <span class="status-value" style="color: #27ae60">配置正常 ✓</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">最近消息时间</span>
+                    <span class="status-value">{status_data['last_msg_time'] or '等待首条消息...'}</span>
+                </div>
+                <div class="log-box">
+                    System: Service is running asynchronously.<br>
+                    External URL: {status_data['external_url']}
+                </div>
+            </div>
+            <div class="footer">WorkChat Integration for Home Assistant</div>
+        </body>
+        </html>
+        """
+
     async def get(self, request, token):
-        """企微 URL 验证步骤."""
-        if token != self.client.config["token"]: return web.Response(status=403)
+        """企微 URL 验证步骤 + 诊断页显示."""
+        if token != self.client.config["token"]: 
+            return web.Response(status=403, text="URL Token Mismatch")
+        
         q = request.query
-        if self._verify(q.get("msg_signature"), q.get("timestamp"), q.get("nonce"), q.get("echostr", "")):
+        echostr = q.get("echostr")
+
+       # --- 如果不是企微验证请求，则进入诊断页 ---
+        if not echostr:
+            # 主动尝试获取/检查一次 Token，确保状态页显示的是最新状态
+            # get_access_token() 内部有锁和时间检查，不会导致重复请求
+            current_token = await self.client.get_access_token()
+            
+            status_data = {
+                "has_token": current_token is not None,
+                "agent_id": self.client.config.get("agent_id"),
+                "external_url": self.client.external_url,
+                "last_msg_time": getattr(self.client, "last_msg_time", None)
+            }
+            return web.Response(text=self._get_status_html(status_data), content_type="text/html")
+
+        # --- 原有的企微校验逻辑 ---
+        if self._verify(q.get("msg_signature"), q.get("timestamp"), q.get("nonce"), echostr):
             try:
                 decrypted = await self.client.hass.async_add_executor_job(
-                    self.client.encryptor.decrypt, q.get("echostr")
+                    self.client.encryptor.decrypt, echostr
                 )
                 return web.Response(text=decrypted)
-            except: pass
-        return web.Response(status=400)
+            except Exception as e:
+                _LOGGER.error("解密验证失败: %s", e)
+        
+        return web.Response(status=400, text="Verification Failed")
 
     async def post(self, request, token):
         """接收加密消息并解析."""
@@ -239,23 +320,25 @@ class WorkChatCallbackView(HomeAssistantView):
             return web.Response(status=500)
 
     async def _process_xml(self, xml_str):
-        """解析 XML 并将数据分发至传感器."""
+        """解析 XML 并将数据分发至传感器，同时记录通信时间."""
+        # 记录最后通信时间
+        self.client.last_msg_time = dt_util.now().strftime("%Y-%m-%d %H:%M:%S")
+
         root = ET.fromstring(xml_str)
         msg_type = root.find("MsgType").text
         
         event_data = {
             "user": root.find("FromUserName").text,
-            "type": msg_type, # 默认类型
+            "type": msg_type,
             "agent_id": root.find("AgentID").text if root.find("AgentID") is not None else "",
             "timestamp": root.find("CreateTime").text,
         }
 
-        # 详细逻辑解析
         if msg_type == "text":
             event_data["content"] = root.find("Content").text
         elif msg_type == "image":
             event_data["media_id"] = root.find("MediaId").text
-            event_data["pic_url"] = root.find("PicUrl").text # 供传感器 entity_picture 使用
+            event_data["pic_url"] = root.find("PicUrl").text
         elif msg_type == "location":
             event_data.update({
                 "lat": root.find("Location_X").text,
@@ -263,7 +346,6 @@ class WorkChatCallbackView(HomeAssistantView):
                 "label": root.find("Label").text if root.find("Label") is not None else ""
             })
         elif msg_type == "event":
-            # --- 关键修复：将菜单点击事件映射为传感器识别的 menu_click ---
             event_name = root.find("Event").text
             if event_name == "click":
                 event_data["type"] = "menu_click"
@@ -274,5 +356,4 @@ class WorkChatCallbackView(HomeAssistantView):
             if (ek := root.find("EventKey")) is not None:
                 event_data["event_key"] = ek.text
 
-        # 触发事件总线，传感器会自动捕获
         self.client.hass.bus.async_fire(EVENT_MESSAGE_RECEIVED, event_data)

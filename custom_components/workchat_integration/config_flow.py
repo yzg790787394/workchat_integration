@@ -113,6 +113,47 @@ class WorkChatIntegrationFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> WorkChatOptionsFlowHandler:
         return WorkChatOptionsFlowHandler()
 
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """处理重新配置流程。"""
+        # 获取当前正在重新配置的 Entry
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            # 1. 校验新凭据
+            error = await self._test_credentials(user_input)
+            if error:
+                errors["base"] = error
+            else:
+                # 2. 标准化 URL
+                user_input[CONF_EXTERNAL_URL] = user_input[CONF_EXTERNAL_URL].rstrip("/") + "/"
+                
+                # 3. 更新现有配置并退出流程
+                return self.async_update_reload_and_abort(
+                    entry, 
+                    data={**entry.data, **user_input},
+                    reason="reconfigure_successful"
+                )
+
+        # 预填当前数据
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema({
+                vol.Required(CONF_CORP_ID, default=entry.data.get(CONF_CORP_ID)): str,
+                vol.Required(CONF_SECRET, default=entry.data.get(CONF_SECRET)): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+                vol.Required(CONF_AGENT_ID, default=entry.data.get(CONF_AGENT_ID)): str,
+                vol.Required(CONF_TOKEN, default=entry.data.get(CONF_TOKEN)): str,
+                vol.Required(CONF_AES_KEY, default=entry.data.get(CONF_AES_KEY)): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+                vol.Required(CONF_EXTERNAL_URL, default=entry.data.get(CONF_EXTERNAL_URL)): str,
+                vol.Optional(CONF_PROXY, default=entry.data.get(CONF_PROXY, "")): str,
+            }),
+            errors=errors,
+        )
+
 class WorkChatOptionsFlowHandler(config_entries.OptionsFlow):
     """处理集成选项修改."""
 

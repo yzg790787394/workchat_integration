@@ -16,9 +16,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install dependencies
+      - name: Run unit tests
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio pytest-homeassistant-custom-component pyjwt cryptography aiohttp
+          # 关键点：设置 PYTHONPATH 为当前目录
+          export PYTHONPATH=$PYTHONPATH:.
+          pytest -v -s ./tests/
       - name: Run unit tests
         run: pytest -v -s ./tests/

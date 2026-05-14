@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+# 必须声明权限，否则无法上传资源
+permissions:
+  contents: write
+
+jobs:
+  release-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create ZIP file
+        run: |
+          # 确保进入你的集成目录名 workchat_integration
+          cd ${{ github.workspace }}/custom_components/workchat_integration
+          # 将当前文件夹内容打包成 workchat_integration.zip
+          zip -r ../../workchat_integration.zip .
+
+      - name: Upload zip to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: workchat_integration.zip
+          asset_name: workchat_integration.zip
+          tag: ${{ github.ref }}
+          overwrite: true

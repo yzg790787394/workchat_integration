@@ -12,22 +12,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # 1. 官方 Hassfest 检查 (必须通过)
       - name: Hassfest validation
         uses: home-assistant/actions/hassfest@master
+
+      # 2. HACS 商店合规性检查
       - name: HACS validation
         uses: hacs/action@main
         with:
           category: integration
+
+      # 3. 静态代码分析
       - name: Static analyse
         run: |
           pip install pylint pyjwt cryptography aiohttp
+          # 扫描所有 .py 文件
           pylint $(git ls-files '*.py') --disable=C0114,C0115,C0116,W0613
+
+      # 4. 模拟 HA 加载环境
       - name: HA Setup Test
+        id: homeassistant
         uses: ludeeus/setup-homeassistant@main
         with:
           config-dir: test_config
-        continue-on-error: false
+
       - name: Install integration
         run: |
-          mkdir -p test_config/custom_components/workchat_integration
-          cp -r custom_components/workchat_integration/* test_config/custom_components/workchat_integration/
+          # 自动获取集成域名并安装到模拟目录
+          DOMAIN=$(python3 -c "import json; print(json.load(open('custom_components/*/manifest.json'))['domain'])")
+          mkdir -p test_config/custom_components/$DOMAIN
+          cp -r custom_components/$DOMAIN/* test_config/custom_components/$DOMAIN/
+          echo "Integration $DOMAIN installed for validation."

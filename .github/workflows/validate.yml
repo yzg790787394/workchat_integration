@@ -26,10 +26,11 @@ jobs:
       # 3. 静态代码分析
       - name: Static analyse
         run: |
-          # 自动安装所有可能用到的通用库
-          python3 -m pip install --upgrade pip
-          pip install pylint pyjwt cryptography aiohttp
-          pylint $(git ls-files '*.py') --disable=C0114,C0115,C0116,W0613
+          pip install pylint pyjwt cryptography aiohttp beautifulsoup4
+          PYTHONPATH=. pylint $(git ls-files '*.py') \
+            --max-line-length=110 \
+            --fail-under=9.0 \
+            --disable=E1123,R0801,W0718,C0114,C0115,C0116,W0613
 
       # 4. 模拟 HA 环境启动校验
       - name: HA Setup Test

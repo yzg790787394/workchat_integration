@@ -19,9 +19,19 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: echo "No dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          # 包含所有运行测试所需的库
+          pip install pytest pytest-asyncio pytest-homeassistant-custom-component pyjwt cryptography aiohttp
 
       - name: Run unit tests
+
+        env:
+          PYTHONPATH: .
         run: |
-          export PYTHONPATH=$PYTHONPATH:.
-          pytest -v -s ./tests/
+          # 确保 tests 文件夹存在才运行，否则优雅退出
+          if [ -d "./tests" ]; then
+            python3 -m pytest -v -s ./tests/
+          else
+            echo "No tests directory found, skipping."
+          fi

@@ -5,9 +5,8 @@ upload_media:
     将本地文件上传到企业微信服务器暂存（有效期3天）。
     上传成功的 media_id 可用于后续发送图片、文件、语音或视频消息。
     注意：HA 必须拥有该路径的访问权限。
-
+  # 必须显式声明 target，否则 response 块会被视为非法
   target: {}
-    
   fields:
     type:
       name: 媒体类型
@@ -41,6 +40,8 @@ upload_media:
 notify:
   name: 发送企微通消息
   description: 通过自建应用推送各类富媒体消息。支持发送给特定用户或全体成员。
+  # 现代集成规范：即使是通知也建议加上 target
+  target: {}
   fields:
     msg_type:
       name: 消息类型
@@ -75,8 +76,6 @@ notify:
       description: 填入成员 ID（UserID）。多个接收人使用“|”分隔。填写“@all”推送给全员。留空则发送给集成配置中的默认用户。
       selector:
         text:
-    
-    # 媒体与链接参数
     media_id:
       name: 媒体文件 ID
       description: 图片、文件、语音或视频消息必填。需先通过“上传媒体文件”服务获取。
@@ -100,8 +99,6 @@ notify:
       selector:
         text:
           type: url
-
-    # 高级参数组
     safe:
       name: 是否保密消息
       description: 设为 1 时，消息在通知栏隐藏正文且禁止转发。默认为 0。

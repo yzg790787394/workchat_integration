@@ -2,7 +2,7 @@
 upload_media:
   name: 上传媒体文件
   description: "将本地文件上传到企业微信服务器暂存（有效期3天）。上传成功的 media_id 可用于后续发送图片、文件、语音或视频消息。"
-  target: {}
+  # 必须移除 response 块才能通过校验
   fields:
     type:
       name: 媒体类型
@@ -33,14 +33,11 @@ upload_media:
       required: false
       selector:
         text:
-  response:
-    optional: false
 
 # 2. 发送企微通消息
 notify:
   name: 发送企微通消息
   description: 通过自建应用推送各类富媒体消息。支持发送给特定用户或全体成员。
-  target: {}
   fields:
     msg_type:
       name: 消息类型

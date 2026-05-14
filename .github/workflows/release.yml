@@ -1,9 +1,8 @@
-name: Auto Release Draft (WorkChat)
+name: Auto Release Draft
 
 on:
   push:
-    branches:
-      - main  # 监听从测试分支合并到 main 的动作
+    branches: [main]
 
 permissions:
   contents: write
@@ -15,50 +14,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 获取完整历史以生成更新说明
+          fetch-depth: 0
 
-      - name: Get Version info
-        id: version_info
+      - name: Get Info
+        id: info
         run: |
-          # 1. 核心：从 workchat_integration 的 manifest.json 读取版本
-          MANIFEST_PATH="custom_components/workchat_integration/manifest.json"
-          VERSION=$(python3 -c "import json; print(json.load(open('$MANIFEST_PATH'))['version'])")
+          VERSION=$(python3 -c "import json; print(json.load(open('custom_components/workchat_integration/manifest.json'))['version'])")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
-          # 2. 判断是否为预览版 (包含 beta, alpha, rc)
+          COMMIT_TITLE=$(git log -1 --pretty=format:"%s")
+          echo "commit_title=$COMMIT_TITLE" >> $GITHUB_OUTPUT
           if [[ $VERSION == *"beta"* ]] || [[ $VERSION == *"rc"* ]] || [[ $VERSION == *"alpha"* ]]; then
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           else
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check if Tag exists
-        id: check_tag
+      - name: Create ZIP
         run: |
-          TAG_NAME="v${{ steps.version_info.outputs.version }}"
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "⚠️ 版本 $TAG_NAME 已存在，流程终止。"
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create ZIP file
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          # 进入企业微信通知目录进行打包
           cd ${{ github.workspace }}/custom_components/workchat_integration
           zip -r ../../workchat_integration.zip .
 
-      - name: Create GitHub Release Draft
-        if: steps.check_tag.outputs.exists == 'false'
+      - name: Create Release Draft
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version_info.outputs.version }}
-          name: workchat integration v${{ steps.version_info.outputs.version }}
+          tag_name: v${{ steps.info.outputs.version }}
+          name: v${{ steps.info.outputs.version }} - ${{ steps.info.outputs.commit_title }}
           files: workchat_integration.zip
-          draft: true             # 发布为草稿，手动确认后公开
-          prerelease: ${{ steps.version_info.outputs.is_prerelease }}
-          generate_release_notes: true # 自动生成 Commit 更新日志
+          draft: true
+          prerelease: ${{ steps.info.outputs.is_prerelease }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

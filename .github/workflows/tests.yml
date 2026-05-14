@@ -12,14 +12,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
       - name: Run unit tests
         run: |
-          # 关键点：设置 PYTHONPATH 为当前目录
           export PYTHONPATH=$PYTHONPATH:.
           pytest -v -s ./tests/
-      - name: Run unit tests
-        run: pytest -v -s ./tests/

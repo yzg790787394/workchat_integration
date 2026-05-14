@@ -1,11 +1,7 @@
 # 1. 媒体上传服务
 upload_media:
   name: 上传媒体文件
-  description: >
-    将本地文件上传到企业微信服务器暂存（有效期3天）。
-    上传成功的 media_id 可用于后续发送图片、文件、语音或视频消息。
-    注意：HA 必须拥有该路径的访问权限。
-  # 必须显式声明 target，否则 response 块会被视为非法
+  description: "将本地文件上传到企业微信服务器暂存（有效期3天）。上传成功的 media_id 可用于后续发送图片、文件、语音或视频消息。"
   target: {}
   fields:
     type:
@@ -16,20 +12,24 @@ upload_media:
       selector:
         select:
           options:
-            - { label: "图片 (image) - 支持JPG/PNG, 2MB内", value: "image" }
-            - { label: "语音 (voice) - 支持AMR, 2MB内", value: "voice" }
-            - { label: "视频 (video) - 支持MP4, 10MB内", value: "video" }
-            - { label: "普通文件 (file) - 任意格式, 20MB内", value: "file" }
+            - label: "图片 (image)"
+              value: "image"
+            - label: "语音 (voice)"
+              value: "voice"
+            - label: "视频 (video)"
+              value: "video"
+            - label: "普通文件 (file)"
+              value: "file"
     file_path:
       name: 文件路径
-      description: 文件的本地绝对路径。如果使用 Docker，请确保路径已映射进容器。
+      description: 文件的本地绝对路径。
       required: true
       example: "/config/www/cam_snapshot.jpg"
       selector:
         text:
     file_name:
       name: 自定义文件名
-      description: 接收方看到的文件名称（建议带上后缀，如 report.pdf）。
+      description: 接收方看到的文件名称。
       required: false
       selector:
         text:
@@ -40,56 +40,64 @@ upload_media:
 notify:
   name: 发送企微通消息
   description: 通过自建应用推送各类富媒体消息。支持发送给特定用户或全体成员。
-  # 现代集成规范：即使是通知也建议加上 target
   target: {}
   fields:
     msg_type:
       name: 消息类型
-      description: 决定消息的呈现方式。不同类型需要配合下方不同的参数使用。
+      description: 决定消息的呈现方式。
       required: true
       default: text
       selector:
         select:
           options:
-            - { label: "纯文本 (text)", value: "text" }
-            - { label: "Markdown (markdown)", value: "markdown" }
-            - { label: "文本卡片 (textcard)", value: "textcard" }
-            - { label: "模版卡片 (template_card) - 交互式", value: "template_card" }
-            - { label: "图文消息 (news) - 带封面", value: "news" }
-            - { label: "图片 (image) - 需 media_id", value: "image" }
-            - { label: "文件 (file) - 需 media_id", value: "file" }
-            - { label: "语音 (voice) - 需 media_id", value: "voice" }
-            - { label: "视频 (video) - 需 media_id", value: "video" }
+            - label: "纯文本 (text)"
+              value: "text"
+            - label: "Markdown (markdown)"
+              value: "markdown"
+            - label: "文本卡片 (textcard)"
+              value: "textcard"
+            - label: "模版卡片 (template_card)"
+              value: "template_card"
+            - label: "图文消息 (news)"
+              value: "news"
+            - label: "图片 (image)"
+              value: "image"
+            - label: "文件 (file)"
+              value: "file"
+            - label: "语音 (voice)"
+              value: "voice"
+            - label: "视频 (video)"
+              value: "video"
     message:
       name: 消息正文
-      description: 消息的主要文本内容。在 text、markdown 和 textcard 类型中必填。支持 \n 换行。
+      description: 消息的主要文本内容。
       selector:
         text:
           multiline: true
     title:
       name: 标题
-      description: 消息标题。适用于 textcard (文本卡片)、news (图文消息) 和 video (视频)。
+      description: 消息标题。
       selector:
         text:
     touser:
       name: 指定接收人
-      description: 填入成员 ID（UserID）。多个接收人使用“|”分隔。填写“@all”推送给全员。留空则发送给集成配置中的默认用户。
+      description: 填入成员 ID，多个用“|”分隔。全员填“@all”。
       selector:
         text:
     media_id:
       name: 媒体文件 ID
-      description: 图片、文件、语音或视频消息必填。需先通过“上传媒体文件”服务获取。
+      description: 图片、文件、语音或视频消息必填。
       selector:
         text:
     url:
       name: 跳转链接
-      description: 点击文本卡片、图文消息或模版卡片后跳转的 URL 地址。
+      description: 点击卡片后跳转的 URL。
       selector:
         text:
           type: url
     btntxt:
       name: 按钮文字
-      description: 文本卡片底部的详情链接按钮文字，默认为“详情”。
+      description: 文本卡片底部的详情链接按钮文字。
       default: 详情
       selector:
         text:
@@ -101,7 +109,7 @@ notify:
           type: url
     safe:
       name: 是否保密消息
-      description: 设为 1 时，消息在通知栏隐藏正文且禁止转发。默认为 0。
+      description: 设为 1 时，消息在通知栏隐藏正文。
       default: 0
       selector:
         number:
@@ -110,11 +118,11 @@ notify:
           mode: box
     articles:
       name: 图文列表 (高级)
-      description: 仅用于 news 类型。支持多篇文章（title, description, url, picurl）。
+      description: 仅用于 news 类型。
       selector:
         object:
     template_card_data:
       name: 模版卡片数据 (JSON)
-      description: 仅用于 template_card 类型。填入企微 API 要求的完整卡片对象。
+      description: 仅用于 template_card 类型。
       selector:
         object:

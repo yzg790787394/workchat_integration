@@ -35,7 +35,6 @@ class WorkChatNotifyEntity(NotifyEntity):
     _attr_has_entity_name = True
     # 建议设置 translation_key，配合 zh-Hans.json 可以翻译为“通知器”
     _attr_translation_key = "workchat_notifier"
-    _attr_name = "Notifier"
     _attr_supported_features = NotifyEntityFeature.TITLE
 
     def __init__(self, client, entry) -> None:

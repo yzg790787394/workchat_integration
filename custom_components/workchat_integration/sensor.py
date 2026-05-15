@@ -29,24 +29,28 @@ class WorkChatSensorEntityDescription(SensorEntityDescription):
 MESSAGE_SENSOR_DESCRIPTIONS: tuple[WorkChatSensorEntityDescription, ...] = (
     WorkChatSensorEntityDescription(
         key="text",
+        name="Text Message",
         translation_key="text_msg",
         event_type="text",
         icon="mdi:chat-processing-outline",
     ),
     WorkChatSensorEntityDescription(
         key="image",
+        name="Image Message",
         translation_key="image_msg",
         event_type="image",
         icon="mdi:image-filter-hdr",
     ),
     WorkChatSensorEntityDescription(
         key="location",
+        name="Location Message",
         translation_key="location_msg",
         event_type="location",
         icon="mdi:map-marker-radius",
     ),
     WorkChatSensorEntityDescription(
         key="menu_click",
+        name="Menu Click",
         translation_key="menu_click",
         event_type="menu_click",
         icon="mdi:cursor-default-click",
@@ -198,6 +202,7 @@ class WorkChatCallbackInfoSensor(WorkChatBaseEntity):
         super().__init__(client, entry)
         self.entity_description = SensorEntityDescription(
             key="callback_info",
+            name="Callback Info",
             translation_key="callback_info",
             icon="mdi:api",
         )
@@ -232,6 +237,7 @@ class WorkChatMediaUploadSensor(WorkChatBaseEntity):
         super().__init__(client, entry)
         self.entity_description = SensorEntityDescription(
             key="last_media_upload",
+            name="Last Media Upload",
             translation_key="media_upload",
             icon="mdi:cloud-upload-outline",
         )

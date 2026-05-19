@@ -1,290 +1,276 @@
-import os
+"""企微通传感器平台实现 - 2026 优化版."""
+from __future__ import annotations
+
 import logging
-from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from dataclasses import dataclass
+from typing import Any
+
+from homeassistant.components.sensor import (
+    SensorEntity,
+    SensorEntityDescription,
+)
+from homeassistant.const import EntityCategory
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
-from .const import DOMAIN
+
+from .__init__ import WorkChatConfigEntry
+from .const import DOMAIN, EVENT_MESSAGE_RECEIVED, EVENT_MEDIA_UPLOADED
 
 _LOGGER = logging.getLogger(__name__)
 
-# 实体描述定义 - 添加回调URL和媒体上传实体
-ENTITY_DESCRIPTIONS = {
-    "text": SensorEntityDescription(
+@dataclass(frozen=True, kw_only=True)
+class WorkChatSensorEntityDescription(SensorEntityDescription):
+    """描述企微通消息传感器的扩展类."""
+    event_type: str | None = None  # 对应企微回调中的 MsgType 或 Event
+
+# 消息监听传感器定义（核心业务）
+MESSAGE_SENSOR_DESCRIPTIONS: tuple[WorkChatSensorEntityDescription, ...] = (
+    WorkChatSensorEntityDescription(
         key="text",
-        name="企微通文本消息",
-        icon="mdi:chat",
+        name="Text Message",
+        translation_key="text_msg",
+        event_type="text",
+        icon="mdi:chat-processing-outline",
     ),
-    "image": SensorEntityDescription(
+    WorkChatSensorEntityDescription(
         key="image",
-        name="企微通图片消息",
-        icon="mdi:image",
+        name="Image Message",
+        translation_key="image_msg",
+        event_type="image",
+        icon="mdi:image-filter-hdr",
     ),
-    "location": SensorEntityDescription(
+    WorkChatSensorEntityDescription(
         key="location",
-        name="企微通位置消息",
-        icon="mdi:map-marker",
+        name="Location Message",
+        translation_key="location_msg",
+        event_type="location",
+        icon="mdi:map-marker-radius",
     ),
-    "callback_info": SensorEntityDescription(
-        key="callback_info",
-        name="企微通回调URL",
-        icon="mdi:webhook",
-    ),
-    "media_upload": SensorEntityDescription(
-        key="media_upload",
-        name="企微通上传媒体文件信息",
-        icon="mdi:file-upload",
-    ),
-    "menu_click": SensorEntityDescription(  # 新增菜单点击实体
+    WorkChatSensorEntityDescription(
         key="menu_click",
-        name="企微通自定义菜单触发信息",
-        icon="mdi:menu",
+        name="Menu Click",
+        translation_key="menu_click",
+        event_type="menu_click",
+        icon="mdi:cursor-default-click",
     ),
-}
+)
 
-class WeComBaseEntity(SensorEntity):
-    """企微通消息实体基类"""
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: WorkChatConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """根据配置条目设置传感器实体."""
+    client = entry.runtime_data
     
-    _attr_has_entity_name = True
-    _attr_should_poll = False
+    entities: list[SensorEntity] = []
     
-    def __init__(self, client, entry, msg_type):
-        self._client = client
-        self._entry = entry
-        
-        # 使用预定义的实体描述
-        self.entity_description = ENTITY_DESCRIPTIONS[msg_type]
-        
-        # 设置唯一ID
-        self._attr_unique_id = f"{entry.entry_id}-{msg_type}"
-        
-        self.msg_data = {}
-        self.last_updated = dt_util.utcnow()
-        
-        # 监听消息事件
-        self._entry.async_on_unload(
-            self._client.hass.bus.async_listen(
-                "workchat_message", self._handle_message
-            )
-        )
+    # 1. 消息监听实体
+    for description in MESSAGE_SENSOR_DESCRIPTIONS:
+        entities.append(WorkChatMessageSensor(client, entry, description))
     
-    def _handle_message(self, event):
-        """处理消息事件"""
-        if event.data["type"] == self.entity_description.key:
-            self.msg_data = event.data
-            self.last_updated = dt_util.utcnow()
-            self.schedule_update_ha_state()
+    # 2. 诊断与状态实体
+    entities.append(WorkChatCallbackInfoSensor(client, entry))
+    entities.append(WorkChatMediaUploadSensor(client, entry))
     
-    @property
-    def extra_state_attributes(self):
-        """返回消息详细信息"""
-        # 将时间戳转换为可读的日期时间格式
-        timestamp_val = self.msg_data.get("timestamp")
-        formatted_time = None
-        if timestamp_val:
-            try:
-                # 将Unix时间戳转换为本地时间
-                dt_obj = dt_util.utc_from_timestamp(timestamp_val)
-                formatted_time = dt_util.as_local(dt_obj).strftime("%Y-%m-%d %H:%M:%S")
-            except Exception as e:
-                _LOGGER.error("时间格式转换失败: %s", str(e))
-                formatted_time = str(timestamp_val)
-        else:
-            formatted_time = "未知"
-            
-        return {
-            "user": self.msg_data.get("user"),
-            "timestamp": formatted_time,  # 使用格式化后的时间
-            "agent_id": self.msg_data.get("agent_id"),
-            **self._get_type_specific_attrs()
-        }
-    
-    @property
-    def native_value(self):
-        """返回主要值"""
-        return self._get_primary_value()
-    
-    def _get_type_specific_attrs(self):
-        """由子类实现特定消息类型的属性"""
-        return {}
-    
-    def _get_primary_value(self):
-        """由子类实现主要显示值"""
-        return ""
-
-class WorkChatTextSensor(WeComBaseEntity):
-    """企微通文本消息实体"""
-    
-    def __init__(self, client, entry):
-        super().__init__(client, entry, "text")
-    
-    def _get_primary_value(self):
-        return self.msg_data.get("content", "")
-    
-    def _get_type_specific_attrs(self):
-        return {
-            "content": self.msg_data.get("content", "")
-        }
-
-class WorkChatImageSensor(WeComBaseEntity):
-    """企微通图片消息实体"""
-    
-    def __init__(self, client, entry):
-        super().__init__(client, entry, "image")
-    
-    def _get_primary_value(self):
-        return self.msg_data.get("media_id", "")
-    
-    def _get_type_specific_attrs(self):
-        return {
-            "pic_url": self.msg_data.get("pic_url", ""),
-            "media_id": self.msg_data.get("media_id", "")
-        }
-
-class WorkChatLocationSensor(WeComBaseEntity):
-    """企微通位置消息实体"""
-    
-    def __init__(self, client, entry):
-        super().__init__(client, entry, "location")
-    
-    def _get_primary_value(self):
-        return self.msg_data.get("label", "")
-    
-    def _get_type_specific_attrs(self):
-        # 直接使用原始字符串值确保精度
-        lat = self.msg_data.get("lat")
-        lon = self.msg_data.get("lon")
-        
-        # 添加后缀确保显示时不被截断
-        return {
-            "latitude": f"{lat}°" if lat is not None else None,
-            "longitude": f"{lon}°" if lon is not None else None,
-            "scale": self.msg_data.get("scale"),
-            "label": self.msg_data.get("label")
-        }
-
-class WorkChatCallbackInfoSensor(SensorEntity):
-    """企微通回调URL信息实体"""
-    
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-    
-    def __init__(self, client, entry):
-        self._client = client
-        self._entry = entry
-        self.entity_description = ENTITY_DESCRIPTIONS["callback_info"]
-        self._attr_unique_id = f"{entry.entry_id}-callback_info"
-        self._state = "已配置"
-        self.last_updated = dt_util.utcnow()
-    
-    @property
-    def native_value(self):
-        return self._state
-    
-    @property
-    def extra_state_attributes(self):
-        """返回回调URL配置信息"""
-        return {
-            "回调URL": self._client.callback_url,
-            "Token": self._client.config["token"],
-            "EncodingAESKey": self._client.config["aes_key"]
-        }
-
-class WorkChatMediaUploadSensor(SensorEntity):
-    """企微通上传媒体文件信息实体"""
-    
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-    
-    def __init__(self, client, entry):
-        self._client = client
-        self._entry = entry
-        self.entity_description = ENTITY_DESCRIPTIONS["media_upload"]
-        self._attr_unique_id = f"{entry.entry_id}-media_upload"
-        self._state = "等待上传"
-        self.upload_data = {}
-        self.last_updated = dt_util.utcnow()
-        
-        # 监听媒体上传事件
-        self._entry.async_on_unload(
-            self._client.hass.bus.async_listen(
-                "workchat_media_uploaded", self._handle_media_upload
-            )
-        )
-    
-    def _handle_media_upload(self, event):
-        """处理媒体上传事件"""
-        self.upload_data = event.data
-        self._state = "已上传"
-        self.last_updated = dt_util.utcnow()
-        self.schedule_update_ha_state()
-    
-    @property
-    def native_value(self):
-        return self._state
-    
-    @property
-    def extra_state_attributes(self):
-        """返回媒体上传信息"""
-        return {
-            "文件名": self.upload_data.get("file_name", ""),
-            "文件类型": self.upload_data.get("type", ""),
-            "上传时间": self.upload_data.get("time", ""),
-            "文件路径": self.upload_data.get("file_path", ""),
-            "media_id": self.upload_data.get("media_id", "")
-        }
-
-class WorkChatMenuClickSensor(WeComBaseEntity):
-    """企微通自定义菜单触发信息实体"""
-    
-    def __init__(self, client, entry):
-        super().__init__(client, entry, "menu_click")
-    
-    def _get_primary_value(self):
-        """返回主要值（EventKey）"""
-        return self.msg_data.get("event_key", "")
-    
-    def _get_type_specific_attrs(self):
-        """返回特定属性"""
-        return {
-            "EventKey": self.msg_data.get("event_key", "")
-        }
-    
-    @property
-    def extra_state_attributes(self):
-        """扩展属性，包括User和CreateTime（转换为北京时间）"""
-        attrs = super().extra_state_attributes
-        # 注意：基类已经提供了user和timestamp（格式化后的时间字符串）属性
-        # 但这里我们按照要求，将User和CreateTime作为单独属性，并且CreateTime是北京时间
-        # 由于基类已经将timestamp转换并放在了一个名为'timestamp'的属性中，但这里要求属性名为'CreateTime'
-        # 我们可以在基类返回的基础上修改，或者覆盖基类的extra_state_attributes方法。
-        # 由于基类已经返回了包含user和timestamp（格式化时间）的字典，我们可以直接使用。
-        # 但是要求是三个属性：User, CreateTime, EventKey
-        # 在基类中，user属性已经存在，我们将其重命名为User（注意大小写）
-        # 同时，基类中有一个'timestamp'属性，我们将其重命名为CreateTime
-        # 另外，我们还需要EventKey，这个在_get_type_specific_attrs中已经返回，并合并到基类属性中。
-        # 因此，我们不需要额外操作，因为基类已经包含了：
-        #   user -> 对应User（但基类属性名为'user'，而要求是'User'，所以需要修改）
-        #   timestamp -> 对应CreateTime（基类属性名为'timestamp'，要求是'CreateTime'）
-        # 所以，我们重新构建一个符合要求的字典，覆盖基类的返回。
-        
-        # 获取基类返回的属性
-        base_attrs = super().extra_state_attributes
-        # 构建新的属性字典
-        new_attrs = {
-            "User": base_attrs.get("user", ""),  # 将基类的user属性映射为User
-            "CreateTime": base_attrs.get("timestamp", ""),  # 基类的timestamp属性就是格式化后的时间字符串
-            "EventKey": self.msg_data.get("event_key", ""),
-        }
-        return new_attrs
-
-async def async_setup_entry(hass, entry, async_add_entities):
-    """设置所有企微通消息实体"""
-    client = hass.data[DOMAIN][entry.entry_id]
-    entities = [
-        WorkChatTextSensor(client, entry),
-        WorkChatImageSensor(client, entry),
-        WorkChatLocationSensor(client, entry),
-        WorkChatCallbackInfoSensor(client, entry),
-        WorkChatMediaUploadSensor(client, entry),
-        WorkChatMenuClickSensor(client, entry)  # 新增菜单点击实体
-    ]
     async_add_entities(entities)
+
+class WorkChatBaseEntity(SensorEntity):
+    """企微通实体的共同基类."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, client, entry: WorkChatConfigEntry):
+        self.client = client
+        self.entry = entry
+        agent_id = entry.data.get("agent_id", "Unknown")
+        
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"WorkChat App ({agent_id})",
+            manufacturer="Tencent",
+            model="WorkChat Integration",
+            configuration_url=f"https://work.weixin.qq.com/wework_admin/frame#apps/modApiApp/{agent_id}",
+        )
+
+class WorkChatMessageSensor(WorkChatBaseEntity):
+    """监听并展示企微特定类型消息的传感器."""
+
+    entity_description: WorkChatSensorEntityDescription
+
+    def __init__(self, client, entry, description: WorkChatSensorEntityDescription):
+        super().__init__(client, entry)
+        self.entity_description = description
+        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        self._msg_data: dict[str, Any] = {}
+
+    async def async_added_to_hass(self) -> None:
+        """注册事件监听器."""
+        self.async_on_remove(
+            self.hass.bus.async_listen(
+                EVENT_MESSAGE_RECEIVED, self._handle_message
+            )
+        )
+
+    @callback
+    def _handle_message(self, event):
+        """处理自定义消息事件."""
+        data = event.data
+        if data.get("type") == self.entity_description.event_type:
+            self._msg_data = data
+            
+            # 处理创建时间
+            if ts := data.get("timestamp"):
+                try:
+                    dt_obj = dt_util.utc_from_timestamp(float(ts))
+                    self._msg_data["formatted_time"] = dt_util.as_local(dt_obj).isoformat()
+                except (ValueError, TypeError):
+                    self._msg_data["formatted_time"] = str(ts)
+            
+            self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str | None:
+        """返回传感器的状态值（优化长字符串显示）."""
+        if not self._msg_data:
+            return None
+        
+        key = self.entity_description.key
+        
+        # 优化图片显示：主状态不显示 ID，显示类型文字
+        if key == "image":
+            return "图片消息" # 或者返回 self._msg_data.get("formatted_time") 只显示时间
+            
+        if key == "text":
+            return self._msg_data.get("content")
+            
+        if key == "menu_click":
+            return self._msg_data.get("event_key")
+            
+        if key == "location":
+            return self._msg_data.get("label") or self._msg_data.get("lat")
+        
+        # 对于其他可能存在的长 ID 类型（如 file, video），进行截断显示
+        val = self._msg_data.get("media_id")
+        if val and len(val) > 16:
+            return f"{val[:6]}...{val[-6:]}"
+        return val
+
+    @property
+    def entity_picture(self) -> str | None:
+        """核心功能：如果是图片传感器，直接在头像处显示图片预览."""
+        if self.entity_description.key == "image":
+            return self._msg_data.get("pic_url")
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """将完整长 ID 存入属性."""
+        if not self._msg_data:
+            return {}
+        
+        attrs = {
+            "from_user": self._msg_data.get("user"),
+            "receive_time": self._msg_data.get("formatted_time"),
+            "agent_id": self._msg_data.get("agent_id"),
+        }
+
+        # 针对图片类型，把长 ID 塞进属性里
+        if self.entity_description.key == "image":
+            attrs["media_id"] = self._msg_data.get("media_id")
+            attrs["pic_url"] = self._msg_data.get("pic_url")
+
+        if self.entity_description.key == "location":
+            attrs.update({
+                "latitude": self._msg_data.get("lat"),
+                "longitude": self._msg_data.get("lon"),
+                "address": self._msg_data.get("label"),
+            })
+        
+        attrs["raw_info"] = self._msg_data
+        return attrs
+
+class WorkChatCallbackInfoSensor(WorkChatBaseEntity):
+    """显示 Webhook 配置与 Token 状态的诊断传感器."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, client, entry):
+        super().__init__(client, entry)
+        self.entity_description = SensorEntityDescription(
+            key="callback_info",
+            name="Callback Info",
+            translation_key="callback_info",
+            icon="mdi:api",
+        )
+        self._attr_unique_id = f"{entry.entry_id}_callback_info"
+
+    @property
+    def native_value(self) -> str:
+        return "Connected" if self.client.callback_url else "Disconnected"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs = {
+            "webhook_url": self.client.callback_url,
+            "corpid": self.client.config.get("corp_id"),
+        }
+        
+        # 安全获取 Token 过期时间
+        expire_ts = getattr(self.client, "_token_expire", 0)
+        if expire_ts > 0:
+            attrs["token_expires_at"] = dt_util.as_local(
+                dt_util.utc_from_timestamp(expire_ts)
+            ).isoformat()
+            
+        return attrs
+
+class WorkChatMediaUploadSensor(WorkChatBaseEntity):
+    """显示最近一次媒体上传 ID 的诊断传感器."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, client, entry):
+        super().__init__(client, entry)
+        self.entity_description = SensorEntityDescription(
+            key="last_media_upload",
+            name="Last Media Upload",
+            translation_key="media_upload",
+            icon="mdi:cloud-upload-outline",
+        )
+        self._attr_unique_id = f"{entry.entry_id}_media_upload"
+        self._upload_data: dict[str, Any] = {}
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            self.hass.bus.async_listen(
+                EVENT_MEDIA_UPLOADED, self._handle_upload
+            )
+        )
+
+    @callback
+    def _handle_upload(self, event):
+        self._upload_data = event.data
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str | None:
+        """主状态显示上传状态和时间."""
+        if not self._upload_data.get("media_id"):
+            return "等待上传"
+        return "已就绪"  # 或者返回 dt_util.now().strftime("%H:%M:%S")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """在属性中保留原始、完整的 media_id."""
+        attrs = {
+            "file_path": self._upload_data.get("file_path"),
+            "media_type": self._upload_data.get("type"),
+            "upload_time": self._upload_data.get("upload_time"),
+            # 完整 ID 存放在这里，方便自动化提取和用户手动复制
+            "media_id": self._upload_data.get("media_id"), 
+        }
+        return attrs

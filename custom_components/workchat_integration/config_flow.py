@@ -1,78 +1,188 @@
+"""企微通集成的配置流程 - 支持可选代理校验."""
 from __future__ import annotations
+
+import logging
+from typing import Any
 import voluptuous as vol
+
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-import re
+from homeassistant.helpers import selector
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-class WorkChatIntegrationFlowHandler(config_entries.ConfigFlow, domain="workchat_integration"):
-    """配置流程处理"""
+from .const import (
+    DOMAIN,
+    CONF_CORP_ID,
+    CONF_SECRET,
+    CONF_AGENT_ID,
+    CONF_TOKEN,
+    CONF_AES_KEY,
+    CONF_RECEIVE_USER,
+    CONF_EXTERNAL_URL,
+    CONF_PROXY,
+    API_BASE,
+)
 
-    async def async_step_user(self, user_input=None) -> FlowResult:
-        errors = {}
+_LOGGER = logging.getLogger(__name__)
+
+class WorkChatIntegrationFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+    """处理企微通集成的配置流程."""
+
+    VERSION = 1
+
+    async def _test_credentials(self, user_input: dict[str, Any]) -> str | None:
+        """测试连接（包含可选代理测试）."""
+        session = async_get_clientsession(self.hass)
+        
+        # 处理可选代理：如果是空字符串或全是空格，则设为 None
+        proxy = user_input.get(CONF_PROXY, "").strip() or None
+        
+        url = f"{API_BASE}/gettoken"
+        params = {
+            "corpid": user_input[CONF_CORP_ID],
+            "corpsecret": user_input[CONF_SECRET]
+        }
+        
+        try:
+            # 在测试时就应用用户填写的代理，确保代理本身是通的
+            async with session.get(url, params=params, proxy=proxy, timeout=10) as resp:
+                data = await resp.json()
+                if data.get("errcode") != 0:
+                    _LOGGER.error("企微认证错误: %s", data.get("errmsg"))
+                    return "invalid_auth"
+        except Exception as err:
+            _LOGGER.error("连接企微失败 (代理: %s): %s", proxy, err)
+            return "cannot_connect"
+        return None
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """用户初始配置."""
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            # 验证 external_url
-            external_url = user_input.get("external_url", "")
-            if not self._is_valid_url(external_url):
-                errors["external_url"] = "invalid_url"
-
-            # 验证 proxy（可选）
-            proxy_url = user_input.get("proxy", "")
-            if not self._is_valid_url(proxy_url):
-                errors["proxy"] = "invalid_proxy_url"
-
+            # 1. 代理 URL 格式预校验（仅在用户填写了内容时校验）
+            proxy = user_input.get(CONF_PROXY, "").strip()
+            if proxy and not proxy.startswith(("http://", "https://")):
+                errors[CONF_PROXY] = "invalid_proxy_format"
+            
             if not errors:
-                # external_url 统一以 / 结尾
-                if not external_url.endswith('/'):
-                    user_input["external_url"] = external_url + '/'
+                # 2. 唯一性校验
+                await self.async_set_unique_id(f"{user_input[CONF_CORP_ID]}_{user_input[CONF_AGENT_ID]}")
+                self._abort_if_unique_id_configured()
 
-                return self.async_create_entry(
-                    title="企微通集成",
-                    data=user_input
-                )
+                # 3. 认证测试
+                error = await self._test_credentials(user_input)
+                if error:
+                    errors["base"] = error
+                else:
+                    # 4. 数据清理并创建
+                    user_input[CONF_EXTERNAL_URL] = user_input[CONF_EXTERNAL_URL].rstrip("/") + "/"
+                    user_input[CONF_PROXY] = proxy or "" # 存入空字符串而不是 None
+                    
+                    return self.async_create_entry(
+                        title=f"企微应用 {user_input[CONF_AGENT_ID]}",
+                        data=user_input
+                    )
 
-        # 默认 external_url
-        external_url = self.hass.config.external_url or self.hass.config.internal_url
-        if external_url and not external_url.endswith('/'):
-            external_url += '/'
+        default_url = self.hass.config.external_url or self.hass.config.internal_url or ""
 
-        # 构建 schema
         data_schema = vol.Schema({
-            vol.Required("corp_id", default=user_input.get("corp_id", "") if user_input else ""): str,
-            vol.Required("secret", default=user_input.get("secret", "") if user_input else ""): str,
-            vol.Required("agent_id", default=user_input.get("agent_id", "") if user_input else ""): str,
-            vol.Required("token", default=user_input.get("token", "") if user_input else ""): str,
-            vol.Required("aes_key", default=user_input.get("aes_key", "") if user_input else ""): str,
-            vol.Required("receive_user", default=user_input.get("receive_user", "@all") if user_input else "@all"): str,
-            vol.Required("external_url", default=user_input.get("external_url", external_url) if user_input else external_url): str,
-
-            # 代理字段真正可选，默认空字符串
-            vol.Optional("proxy", default=user_input.get("proxy", "") if user_input else ""): str,
+            vol.Required(CONF_CORP_ID): str,
+            vol.Required(CONF_SECRET): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
+            vol.Required(CONF_AGENT_ID): str,
+            vol.Required(CONF_TOKEN): str,
+            vol.Required(CONF_AES_KEY): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
+            vol.Optional(CONF_RECEIVE_USER, default="@all"): str,
+            vol.Required(CONF_EXTERNAL_URL, default=default_url): str,
+            vol.Optional(CONF_PROXY, default=""): str, # 设置默认值为空字符串
         })
 
         return self.async_show_form(
             step_id="user",
             data_schema=data_schema,
             errors=errors,
-            description_placeholders={
-                "proxy_help": "可选，用于通过代理服务器连接企业微信API。例如：http://您的VPS_IP:3128"
-            }
         )
 
-    def _is_valid_url(self, url):
-        """验证URL格式是否有效（允许空值）"""
-        if not url or not str(url).strip():
-            return True  # 空值、空白字符串都合法（用于可选 proxy）
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> WorkChatOptionsFlowHandler:
+        return WorkChatOptionsFlowHandler()
 
-        url = url.strip()
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """处理重新配置流程。"""
+        # 获取当前正在重新配置的 Entry
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            # 1. 校验新凭据
+            error = await self._test_credentials(user_input)
+            if error:
+                errors["base"] = error
+            else:
+                # 2. 标准化 URL
+                user_input[CONF_EXTERNAL_URL] = user_input[CONF_EXTERNAL_URL].rstrip("/") + "/"
+                
+                # 3. 更新现有配置并退出流程
+                return self.async_update_reload_and_abort(
+                    entry, 
+                    data={**entry.data, **user_input},
+                    reason="reconfigure_successful"
+                )
 
-        url_pattern = re.compile(
-            r'^(https?)://'  # http:// 或 https://
-            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # 域名
-            r'localhost|'  # localhost
-            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # IP
-            r'(?::\d+)?'  # 端口
-            r'(?:/?|[/?]\S+)$',
-            re.IGNORECASE
+        # 预填当前数据
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema({
+                vol.Required(CONF_CORP_ID, default=entry.data.get(CONF_CORP_ID)): str,
+                vol.Required(CONF_SECRET, default=entry.data.get(CONF_SECRET)): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+                vol.Required(CONF_AGENT_ID, default=entry.data.get(CONF_AGENT_ID)): str,
+                vol.Required(CONF_TOKEN, default=entry.data.get(CONF_TOKEN)): str,
+                vol.Required(CONF_AES_KEY, default=entry.data.get(CONF_AES_KEY)): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
+                vol.Required(CONF_EXTERNAL_URL, default=entry.data.get(CONF_EXTERNAL_URL)): str,
+                vol.Optional(CONF_PROXY, default=entry.data.get(CONF_PROXY, "")): str,
+            }),
+            errors=errors,
         )
-        return re.match(url_pattern, url) is not None
+
+class WorkChatOptionsFlowHandler(config_entries.OptionsFlow):
+    """处理集成选项修改."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """管理选项菜单."""
+        errors: dict[str, str] = {}
+        
+        if user_input is not None:
+            proxy = user_input.get(CONF_PROXY, "").strip()
+            if proxy and not proxy.startswith(("http://", "https://")):
+                errors[CONF_PROXY] = "invalid_proxy_format"
+            
+            if not errors:
+                new_data = {**self.config_entry.data, **user_input}
+                # 更新并保存，触发集成重载
+                self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
+                return self.async_create_entry(title="", data={})
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    CONF_RECEIVE_USER,
+                    default=self.config_entry.data.get(CONF_RECEIVE_USER, "@all"),
+                ): str,
+                vol.Optional(
+                    CONF_PROXY,
+                    default=self.config_entry.data.get(CONF_PROXY, ""),
+                ): str,
+            }),
+            errors=errors,
+        )
